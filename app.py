@@ -56,20 +56,6 @@ def fetch_override_ref_data(selected_module=None):
         st.error(f"Error fetching data from Override_Ref: {e}")
         return pd.DataFrame()
 
-# Function to fetch the latest update timestamp from the selected table
-def fetch_latest_update_timestamp(table_name):
-    try:
-        query = f"""
-            SELECT MAX(insert_ts) AS latest_update
-            FROM {table_name}
-        """
-        result = session.sql(query).to_pandas()
-        latest_update = result['LATEST_UPDATE'].iloc[0]
-        return latest_update
-    except Exception as e:
-        st.error(f"Error fetching latest update timestamp from {table_name}: {e}")
-        return None
-
 # Function to update record flag in source table
 def update_source_table_record_flag(source_table, primary_key_values):
     try:
@@ -143,9 +129,6 @@ def insert_into_override_table(target_table, asofdate, segment, category, src_in
 
 # Main app
 def main():
-    # Title with custom styling
-    st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
-
     # Get module from URL
     query_params = st.query_params
     module_number = query_params.get("module", None)
@@ -153,32 +136,27 @@ def main():
     # Get tables for the selected module
     module_tables_df = fetch_override_ref_data(module_number)
 
-    # Display Module Name
+    # Display Module Name in a styled box (light ice blue background)
     if module_number and not module_tables_df.empty:
         # Get the module name from the Override_Ref table
         module_name = module_tables_df['MODULE_NAME'].iloc[0]
-        st.markdown(f"<h2 style='text-align: center;'>Module: {module_name}</h2>", unsafe_allow_html=True)
+        
+        # Display the module name in a light ice blue box
+        st.markdown(f"""
+            <div style="background-color: #E0F7FA; padding: 10px; border-radius: 5px; text-align: center; font-size: 16px;">
+                <strong>Module:</strong> {module_name}
+            </div>
+        """, unsafe_allow_html=True)
     else:
         st.info("Please select a module from Power BI.")
         st.stop()
 
-    # Fetch and display the last updated timestamp
     if not module_tables_df.empty:
-        selected_table = module_tables_df['SOURCE_TABLE'].iloc[0]  # Get the first table for example
-        last_updated = fetch_latest_update_timestamp(selected_table)
-
-        if last_updated:
-            st.markdown(f"""
-                <div style="background-color: #E0F7FA; padding: 10px; border-radius: 5px; text-align: center; font-size: 16px;">
-                    <strong>Last Updated:</strong> {last_updated}
-                </div>
-            """, unsafe_allow_html=True)
-
-        available_tables = module_tables_df['SOURCE_TABLE'].unique()
+        available_tables = module_tables_df['SOURCE_TABLE'].unique() # Get source tables based on module
 
         # Add select table box
         selected_table = st.selectbox("Select Table", available_tables)
-
+        
         # Filter Override_Ref data based on the selected table
         table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
@@ -252,7 +230,7 @@ def main():
                                     # Get the old insert timestamp
                                     src_ins_ts = str(source_df.loc[index, 'INSERT_TS'])
 
-                                    # Before updating we need extract current record values from source table.
+                                    # Before updating we need to extract current record values from source table.
                                     asofdate = row['ASOFDATE']
                                     segment = row['SEGMENT']
                                     category = row['CATEGORY']
@@ -274,7 +252,6 @@ def main():
                             st.error(f"Error during update/insert: {e}")
                 else:
                     st.info(f"No data available in {selected_table}.")
-
             with tab2:
                 st.subheader(f"Overridden Values from {target_table_name}")
 
