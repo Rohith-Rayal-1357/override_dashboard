@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from snowflake.snowpark import Session
+from snowflake.snowpark.context import get_active_session
 from datetime import datetime
 
 # Page configuration
@@ -13,7 +13,7 @@ st.set_page_config(
 # Title with custom styling
 st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
 
-# Snowflake connection parameters from Streamlit secrets
+# Snowflake credentials from Streamlit secrets
 sf_config = {
     "account": st.secrets["snowflake"]["SNOWFLAKE_ACCOUNT"],
     "user": st.secrets["snowflake"]["SNOWFLAKE_USER"],
@@ -23,19 +23,10 @@ sf_config = {
     "schema": st.secrets["snowflake"]["SNOWFLAKE_SCHEMA"]
 }
 
-# Get Snowflake session
-def get_sf_session():
-    try:
-        session = Session.builder.configs(sf_config).create()
-        return session
-    except Exception as e:
-        st.error(f"Error establishing Snowflake session: {e}")
-        return None
-
-session = get_sf_session()
-
+# Get active Snowflake session
+session = get_active_session()
 if session is None:
-    st.error("Unable to establish a Snowflake session. Please check your credentials and try again.")
+    st.error("Unable to establish a Snowflake session. Please ensure you are running this app within a Snowflake environment.")
     st.stop()
 
 # Function to fetch data based on the table name
