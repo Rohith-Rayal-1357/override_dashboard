@@ -50,7 +50,8 @@ def fetch_override_ref_data(selected_module=None):
 
         # Filter based on the selected module if provided
         if selected_module:
-            df = df[df['MODULE_NAME'] == selected_module]
+            df = df[df['MODULE'] == int(selected_module)]
+
         return df
     except Exception as e:
         st.error(f"Error fetching data from Override_Ref: {e}")
@@ -134,22 +135,23 @@ def main():
 
     # Get module from URL
     query_params = st.query_params
-    module_name = query_params.get("module", None)
+    module_number = query_params.get("module", None)
 
     # Display Module Name
-    if module_name:
-        st.markdown(f"<h2 style='text-align: center;'>Module: {module_name}</h2>", unsafe_allow_html=True)
+    if module_number:
+        st.markdown(f"<h2 style='text-align: center;'>Module: {module_number}</h2>", unsafe_allow_html=True)
     else:
         st.info("Please select a module from Power BI.")
         st.stop()
 
     # Get tables for the selected module
-    module_tables_df = fetch_override_ref_data(module_name)
+    module_tables_df = fetch_override_ref_data(module_number)
 
     if not module_tables_df.empty:
-        available_tables = module_tables_df['SOURCE_TABLE'].unique()
+        # Filter Override_Ref data based on the selected table
+        # table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table] #No need to filter
 
-        # Select table within the module
+        available_tables = module_tables_df['SOURCE_TABLE'].unique()
         selected_table = st.selectbox("Select Table", available_tables)
 
         # Filter Override_Ref data based on the selected table
@@ -258,8 +260,11 @@ def main():
             else:
                 st.info(f"No overridden data available in {target_table_name}.")
 
+        else:
+            st.warning("No table information found in Override_Ref for the selected table.")
+
     else:
-        st.warning("No table information found in Override_Ref for the selected table.")
+        st.warning("No tables found for the selected module in Override_Ref table.")
 
 # Run the main function
 if __name__ == "__main__":
