@@ -134,7 +134,7 @@ table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_ta
 if not table_info_df.empty:
     target_table_name = table_info_df['TARGET_TABLE'].iloc[0]
     
-    # **Enhancement: Allow editable column selection**
+    # Allow editable column selection
     editable_columns = table_info_df['EDITABLE_COLUMN'].unique()
     selected_column = st.selectbox("Select Editable Column", editable_columns)
     st.markdown(f"### **Editable Column:** {selected_column.upper()}")
@@ -232,8 +232,7 @@ if not table_info_df.empty:
         else:
             st.info(f"No overridden data available in {target_table_name}.")
 
-# **Enhancement: Block Module Selection**
-# For demonstration, let's block module selection if it's not in a predefined list
+# Block module selection if necessary
 blocked_modules = [1, 3]  # Example blocked modules
 if selected_module in blocked_modules:
     st.error(f"Module {selected_module} is currently blocked.")
