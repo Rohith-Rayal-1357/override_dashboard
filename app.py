@@ -73,33 +73,38 @@ def update_source_table_record_flag(source_table, primary_key_values):
 # Function to insert new row in source table
 def insert_into_source_table(source_table, row_data, new_value, editable_column):
     try:
+        # Create a copy of row_data to avoid modifying the original DataFrame
         row_data_copy = row_data.copy()
-
+        
+        # Remove the editable column from the copied dictionary
         if editable_column.upper() in row_data_copy:
             del row_data_copy[editable_column.upper()]
 
+        # Remove the RECORD_FLAG column from the copied dictionary
         if 'RECORD_FLAG' in row_data_copy:
             del row_data_copy['RECORD_FLAG']
 
+        # Remove the INSERT_TS column from the copied dictionary
         if 'INSERT_TS' in row_data_copy:
             del row_data_copy['INSERT_TS']
     
         columns = ", ".join(row_data_copy.keys())
         
+        # Properly format the values based on their type
         formatted_values = []
         for col, val in row_data_copy.items():
             if isinstance(val, str):
                 formatted_values.append(f"'{val}'")
-            elif pd.isna(val):
+            elif pd.isna(val):  # Handle potential NaN values, converting to NULL
                 formatted_values.append("NULL")
             elif isinstance(val, (int, float)):
                 formatted_values.append(str(val))
-            elif isinstance(val, pd.Timestamp):
-                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
-            elif isinstance(val, datetime):
-                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
+            elif isinstance(val, pd.Timestamp):  # Format Timestamp
+                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")  # Snowflake TIMESTAMP format
+            elif isinstance(val, datetime):  # Format datetime object
+                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
             else:
-                formatted_values.append(f"'{str(val)}'")
+                formatted_values.append(f"'{str(val)}'")  # Default to string if unknown type
 
         values = ", ".join(formatted_values)
 
@@ -124,24 +129,35 @@ def insert_into_override_table(target_table, asofdate, segment, category, src_in
 
 # Main app
 def main():
+    # Get module from URL
     query_params = st.query_params
     module_number = query_params.get("module", None)
 
+    # Get tables for the selected module
     module_tables_df = fetch_override_ref_data(module_number)
 
+    # Display Module Name in a styled box (light ice blue background)
     if module_number and not module_tables_df.empty:
+        # Get the module name from the Override_Ref table
         module_name = module_tables_df['MODULE_NAME'].iloc[0]
-        st.markdown(f"<h2 style='text-align: center;'>Module: {module_name}</h2>", unsafe_allow_html=True)
+        
+        # Display the module name in a light ice blue box
+        st.markdown(f"""
+            <div style="background-color: #E0F7FA; padding: 10px; border-radius: 5px; text-align: center; font-size: 16px;">
+                <strong>Module:</strong> {module_name}
+            </div>
+        """, unsafe_allow_html=True)
     else:
         st.info("Please select a module from Power BI.")
         st.stop()
 
     if not module_tables_df.empty:
+        available_tables = module_tables_df['SOURCE_TABLE'].unique() # Get source tables based on module
 
-        available_tables = module_tables_df['SOURCE_TABLE'].unique()
-
+        # Add select table box
         selected_table = st.selectbox("Select Table", available_tables)
         
+        # Filter Override_Ref data based on the selected table
         table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
         if not table_info_df.empty:
@@ -149,63 +165,86 @@ def main():
             editable_column = table_info_df['EDITABLE_COLUMN'].iloc[0]
             editable_column_upper = editable_column.upper()
 
+            # Display the editable column in a disabled selectbox
             st.selectbox("Editable Column", [editable_column], disabled=True, key="editable_column_selectbox")
 
+            # Display the editable column label below the selectbox
             st.markdown(f"**Editable Column:** {editable_column_upper}")
 
-            primary_key_cols = ['ASOFDATE', 'SEGMENT', 'CATEGORY']
+            # Determine primary key columns dynamically based on selected_table
+            if selected_table == 'portfolio_perf':
+                primary_key_cols = ['ASOFDATE', 'SEGMENT', 'CATEGORY']
+            else:
+                st.error("Primary key columns not defined for this table. Please update the code.")
+                st.stop()
 
+            # Split the data into two tabs
             tab1, tab2 = st.tabs(["Source Data", "Overridden Values"])
 
             with tab1:
                 st.subheader(f"Source Data from {selected_table}")
 
+                # Fetch data at the beginning
                 source_df = fetch_data(selected_table)
                 if not source_df.empty:
+                    # Retain only 'A' records
                     source_df = source_df[source_df['RECORD_FLAG'] == 'A'].copy()
 
+                    # Make the dataframe editable using st.data_editor
                     edited_df = source_df.copy()
 
+                    # Apply a background color to the editable column
                     def highlight_editable_column(df, column_name):
                         styled_df = pd.DataFrame('', index=df.index, columns=df.columns)
                         styled_df[column_name] = 'background-color: #FFFFE0'
                         return styled_df
 
+                    # Disable editing for all columns except the selected editable column
                     disabled_cols = [col for col in edited_df.columns if col != editable_column_upper]
 
                     styled_df = edited_df.style.apply(highlight_editable_column, column_name=editable_column_upper, axis=None)
 
                     edited_df = st.data_editor(
-                        styled_df,
+                        styled_df,  # Pass the styled dataframe
                         key=f"data_editor_{selected_table}_{editable_column}",
                         num_rows="dynamic",
                         use_container_width=True,
                         disabled=disabled_cols
                     )
 
+                    # Submit button to update the source table and insert to the target table
                     if st.button("Submit Updates"):
                         try:
+                            # Identify rows that have been edited
                             changed_rows = edited_df[edited_df[editable_column_upper] != source_df[editable_column_upper]]
 
                             if not changed_rows.empty:
                                 for index, row in changed_rows.iterrows():
+                                    # Extract primary key values
                                     primary_key_values = {col: row[col] for col in primary_key_cols}
 
+                                    # Get new value for the selected column
                                     new_value = row[editable_column_upper]
                                     old_value = source_df.loc[index, editable_column_upper]
 
+                                    # Get the old insert timestamp
                                     src_ins_ts = str(source_df.loc[index, 'INSERT_TS'])
 
+                                    # Before updating we need to extract current record values from source table.
                                     asofdate = row['ASOFDATE']
                                     segment = row['SEGMENT']
                                     category = row['CATEGORY']
 
+                                    # 1. Mark the old record as 'D'
                                     update_source_table_record_flag(selected_table, primary_key_values)
 
+                                    # 2. Insert the new record with 'A'
                                     insert_into_source_table(selected_table, source_df.loc[index].to_dict(), new_value, editable_column)
 
+                                    # 3. Insert into override table
                                     insert_into_override_table(target_table_name, asofdate, segment, category, src_ins_ts, old_value, new_value)
 
+                                # Capture the current timestamp and store it in session state
                                 current_timestamp = datetime.now().strftime('%B %d, %Y %H:%M:%S')
                                 st.session_state.last_update_time = current_timestamp
 
@@ -217,21 +256,21 @@ def main():
                             st.error(f"Error during update/insert: {e}")
                 else:
                     st.info(f"No data available in {selected_table}.")
-
             with tab2:
                 st.subheader(f"Overridden Values from {target_table_name}")
 
+                # Fetch overridden data
                 override_df = fetch_data(target_table_name)
                 if not override_df.empty:
                     st.dataframe(override_df, use_container_width=True)
                 else:
                     st.info(f"No overridden data available in {target_table_name}.")
-
         else:
             st.warning("No table information found in Override_Ref for the selected table.")
     else:
         st.warning("No tables found for the selected module in Override_Ref table.")
 
+    # Display the last update timestamp in the footer
     if 'last_update_time' in st.session_state:
         last_update_time = st.session_state.last_update_time
         st.markdown("---")
