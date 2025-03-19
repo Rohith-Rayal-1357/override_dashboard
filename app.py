@@ -56,52 +56,6 @@ def fetch_override_ref_data(selected_module=None):
         st.error(f"Error fetching data from Override_Ref: {e}")
         return pd.DataFrame()
 
-
-# Function to insert new row in source table
-def insert_into_source_table(source_table, row_data, new_value, editable_column):
-    try:
-        # Create a copy of row_data to avoid modifying the original DataFrame
-        row_data_copy = row_data.copy()
-        
-        # Remove the editable column from the copied dictionary
-        if editable_column.upper() in row_data_copy:
-            del row_data_copy[editable_column.upper()]
-
-        # Remove the RECORD_FLAG column from the copied dictionary
-        if 'RECORD_FLAG' in row_data_copy:
-            del row_data_copy['RECORD_FLAG']
-
-        # Remove the INSERT_TS column from the copied dictionary
-        if 'INSERT_TS' in row_data_copy:
-            del row_data_copy['INSERT_TS']
-    
-        columns = ", ".join(row_data_copy.keys())
-        
-        # Properly format the values based on their type
-        formatted_values = []
-        for col, val in row_data_copy.items():
-            if isinstance(val, str):
-                formatted_values.append(f"'{val}'")
-            elif pd.isna(val):  # Handle potential NaN values, converting to NULL
-                formatted_values.append("NULL")
-            elif isinstance(val, (int, float)):
-                formatted_values.append(str(val))
-            elif isinstance(val, pd.Timestamp):  # Format Timestamp
-                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")  # Snowflake TIMESTAMP format
-            elif isinstance(val, datetime):  # Format datetime object
-                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
-            else:
-                formatted_values.append(f"'{str(val)}'")  # Default to string if unknown type
-
-        values = ", ".join(formatted_values)
-
-        insert_sql = f"""
-            INSERT INTO {source_table} ({columns}, {editable_column}, record_flag, insert_ts)
-            VALUES ({values}, '{new_value}', 'A', CURRENT_TIMESTAMP())
-        """
-        session.sql(insert_sql).collect()
-    except Exception as e:
-        st.error(f"Error inserting into {source_table}: {e}")
 # Function to update record flag in source table
 def update_source_table_record_flag(source_table, primary_key_values):
     try:
@@ -115,6 +69,52 @@ def update_source_table_record_flag(source_table, primary_key_values):
         session.sql(update_sql).collect()
     except Exception as e:
         st.error(f"Error updating record flag in {source_table}: {e}")
+
+# Function to insert new row in source table
+def insert_into_source_table(source_table, row_data, new_value, editable_column):
+    try:
+        # Create a copy of row_data to avoid modifying the original DataFrame
+        row_data_copy = row_data.copy()
+
+        # Remove the editable column from the copied dictionary
+        if editable_column.upper() in row_data_copy:
+            del row_data_copy[editable_column.upper()]
+
+        # Remove the RECORD_FLAG column from the copied dictionary
+        if 'RECORD_FLAG' in row_data_copy:
+            del row_data_copy['RECORD_FLAG']
+
+        # Remove the INSERT_TS column from the copied dictionary
+        if 'INSERT_TS' in row_data_copy:
+            del row_data_copy['INSERT_TS']
+
+        columns = ", ".join(row_data_copy.keys())
+
+        # Properly format the values based on their type
+        formatted_values = []
+        for col, val in row_data_copy.items():
+            if isinstance(val, str):
+                formatted_values.append(f"'{val}'")
+            elif pd.isna(val):  # Handle potential NaN values, converting to NULL
+                formatted_values.append("NULL")
+            elif isinstance(val, (int, float)):
+                formatted_values.append(str(val))
+            elif isinstance(val, pd.Timestamp):  # Format Timestamp
+                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")  # Snowflake TIMESTAMP format
+            elif isinstance(val, datetime):  # Format datetime object
+                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
+            else:
+                formatted_values.append(f"'{str(val)}'")  # Default to string if unknown type
+
+        values = ", ".join(formatted_values)
+
+        insert_sql = f"""
+            INSERT INTO {source_table} ({columns}, {editable_column}, record_flag, insert_ts)
+            VALUES ({values}, '{new_value}', 'A', CURRENT_TIMESTAMP())
+        """
+        session.sql(insert_sql).collect()
+    except Exception as e:
+        st.error(f"Error inserting into {source_table}: {e}")
 
 # Function to insert into override table
 def insert_into_override_table(target_table, asofdate, segment, category, src_ins_ts, amount_old, amount_new):
@@ -140,7 +140,7 @@ def main():
     if module_number and not module_tables_df.empty:
         # Get the module name from the Override_Ref table
         module_name = module_tables_df['MODULE_NAME'].iloc[0]
-        
+
         # Display the module name in a light ice blue box
         st.markdown(f"""
             <div style="background-color: #E0F7FA; padding: 10px; border-radius: 5px; text-align: center; font-size: 16px;">
@@ -152,11 +152,11 @@ def main():
         st.stop()
 
     if not module_tables_df.empty:
-        available_tables = module_tables_df['SOURCE_TABLE'].unique() # Get source tables based on module
+        available_tables = module_tables_df['SOURCE_TABLE'].unique()  # Get source tables based on module
 
         # Add select table box
         selected_table = st.selectbox("Select Table", available_tables)
-        
+
         # Filter Override_Ref data based on the selected table
         table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
@@ -171,9 +171,8 @@ def main():
             # Display the editable column label below the selectbox
             st.markdown(f"**Editable Column:** {editable_column_upper}")
 
-            # Dynamically fetch primary key columns and join keys from the Override_Ref table
-            join_keys = table_info_df['JOIN_KEYS'].iloc[0].split(',')  # Assuming join_keys are stored as comma-separated values
-            primary_key_cols = [key.strip().upper() for key in join_keys]
+            # Dynamically determine primary key columns based on Override_Ref
+            primary_key_cols = table_info_df['PRIMARY_KEY_COLS'].iloc[0].split(',')  # Assuming PRIMARY_KEY_COLS contains a comma-separated string
 
             # Split the data into two tabs
             tab1, tab2 = st.tabs(["Source Data", "Overridden Values"])
@@ -221,7 +220,7 @@ def main():
                             if not changed_rows.empty:
                                 for index, row in changed_rows.iterrows():
                                     # Extract primary key values
-                                    primary_key_values = {col: row[col] for col in primary_key_cols}
+                                    primary_key_values = {col.upper(): row[col] for col in primary_key_cols}
 
                                     # Get new value for the selected column
                                     new_value = row[f"{editable_column_upper} ✏️"]
@@ -230,7 +229,7 @@ def main():
                                     # Get the old insert timestamp
                                     src_ins_ts = str(source_df.loc[index, 'INSERT_TS'])
 
-                                    # Before updating we need to extract current record values from source table.
+                                    # Extract other fields for override table
                                     asofdate = row['ASOFDATE']
                                     segment = row['SEGMENT']
                                     category = row['CATEGORY']
