@@ -193,11 +193,15 @@ def main():
                     # Make the dataframe editable using st.data_editor
                     edited_df = source_df.copy()
 
-                    # Apply a background color to the editable column and add a pencil symbol
+                    # Add the pencil symbol (✏️) next to the editable column's values
+                    edited_df[editable_column_upper] = edited_df[editable_column_upper].apply(
+                        lambda x: f"{x} ✏️"
+                    )
+
+                    # Apply a background color to the editable column
                     def highlight_editable_column(df, column_name):
                         styled_df = pd.DataFrame('', index=df.index, columns=df.columns)
                         styled_df[column_name] = 'background-color: #FFFFE0'  # Light yellow background
-                        df[column_name] = df[column_name].apply(lambda x: f"{x} ✏️")  # Add pencil symbol
                         return styled_df
 
                     # Disable editing for all columns except the selected editable column
