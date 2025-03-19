@@ -76,7 +76,7 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
     try:
         # Create a copy of row_data to avoid modifying the original DataFrame
         row_data_copy = row_data.copy()
-        
+
         # Remove the editable column from the copied dictionary
         if editable_column.upper() in row_data_copy:
             del row_data_copy[editable_column.upper()]
@@ -88,9 +88,9 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
         # Remove the INSERT_TS column from the copied dictionary
         if 'INSERT_TS' in row_data_copy:
             del row_data_copy['INSERT_TS']
-    
+
         columns = ", ".join(row_data_copy.keys())
-        
+
         # Properly format the values based on their type
         formatted_values = []
         for col, val in row_data_copy.items():
@@ -103,7 +103,7 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
             elif isinstance(val, pd.Timestamp):  # Format Timestamp
                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")  # Snowflake TIMESTAMP format
             elif isinstance(val, datetime):  # Format datetime object
-                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
+                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
             else:
                 formatted_values.append(f"'{str(val)}'")  # Default to string if unknown type
 
@@ -150,23 +150,13 @@ if not module_tables_df.empty:
     # Select table within the module
     selected_table = st.selectbox("Select Table", available_tables)
 
-    # Fetch data for the selected table
-    source_df = fetch_data(selected_table)
-
-    # Add a dropdown for selecting the editable column
-    if not source_df.empty:
-        available_columns = source_df.columns.tolist()
-        editable_column = st.selectbox("Select Editable Column", available_columns)
-        editable_column_upper = editable_column.upper()
-    else:
-        st.warning(f"No data available in {selected_table} to select editable columns.")
-        st.stop()
-
     # Filter Override_Ref data based on the selected table
     table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
     if not table_info_df.empty:
         target_table_name = table_info_df['TARGET_TABLE'].iloc[0]
+        editable_column = table_info_df['EDITABLE_COLUMN'].iloc[0]
+        editable_column_upper = editable_column.upper()
 
         # Determine primary key columns dynamically based on selected_table
         if selected_table == 'portfolio_perf':
@@ -182,7 +172,7 @@ if not module_tables_df.empty:
             st.subheader(f"Source Data from {selected_table}")
 
             # Fetch data at the beginning
-            # source_df = fetch_data(selected_table) #No need to fetch again
+            source_df = fetch_data(selected_table)
             if not source_df.empty:
                 # Retain only 'A' records
                 source_df = source_df[source_df['RECORD_FLAG'] == 'A'].copy()
@@ -223,7 +213,7 @@ if not module_tables_df.empty:
                                 # Get new value for the selected column
                                 new_value = row[editable_column_upper]
                                 old_value = source_df.loc[index, editable_column_upper]
-                                
+
                                 # Get the old insert timestamp
                                 src_ins_ts = str(source_df.loc[index, 'INSERT_TS'])
 
