@@ -56,25 +56,37 @@ def fetch_override_ref_data(selected_module=None):
         st.error(f"Error fetching data from Override_Ref: {e}")
         return pd.DataFrame()
 
-
+# Function to update record flag in source table
+def update_source_table_record_flag(source_table, primary_key_values):
+    try:
+        where_clause = " AND ".join([f"src.{col} = '{val}'" for col, val in primary_key_values.items()])
+        update_sql = f"""
+            UPDATE {source_table} src
+            SET record_flag = 'D',
+                insert_ts = CURRENT_TIMESTAMP()
+            WHERE {where_clause}
+            AND src.record_flag = 'A'
+        """
+        session.sql(update_sql).collect()
+    except Exception as e:
+        st.error(f"Error updating record flag in {source_table}: {e}")
 
 # Function to insert new row in source table
-def insert_into_source_table(source_table, row_data, new_value, editable_column):
+def insert_into_source_table(source_table, row_data, new_value, editable_column, primary_key_cols):
     try:
         # Create a copy of row_data to avoid modifying the original DataFrame
         row_data_copy = row_data.copy()
 
-        # Remove the editable column from the copied dictionary
-        if editable_column.upper() in row_data_copy:
-            del row_data_copy[editable_column.upper()]
+        # Remove the editable column and primary key columns from the copied dictionary
+        cols_to_remove = [editable_column.upper()] # Corrected: Only remove the editable column, keep PKs
+        for col in cols_to_remove:
+            if col in row_data_copy:
+                del row_data_copy[col]
 
-        # Remove the RECORD_FLAG column from the copied dictionary
-        if 'RECORD_FLAG' in row_data_copy:
-            del row_data_copy['RECORD_FLAG']
-
-        # Remove the INSERT_TS column from the copied dictionary
-        if 'INSERT_TS' in row_data_copy:
-            del row_data_copy['INSERT_TS']
+        # Remove the RECORD_FLAG and INSERT_TS columns if they exist
+        for col in ['RECORD_FLAG', 'INSERT_TS']:
+            if col in row_data_copy:
+                del row_data_copy[col]
 
         columns = ", ".join(row_data_copy.keys())
 
@@ -103,29 +115,14 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
         session.sql(insert_sql).collect()
     except Exception as e:
         st.error(f"Error inserting into {source_table}: {e}")
-# Function to update record flag in source table
-def update_source_table_record_flag(source_table, primary_key_values):
-    try:
-        where_clause = " AND ".join([f"src.{col} = '{val}'" for col, val in primary_key_values.items()])  # Qualified column names
-        update_sql = f"""
-            UPDATE {source_table} src
-            SET record_flag = 'D',
-                insert_ts = CURRENT_TIMESTAMP()
-            WHERE {where_clause}
-            AND src.record_flag = 'A'   --Qualified record_flag
-        """
-        session.sql(update_sql).collect()
-    except Exception as e:
-        st.error(f"Error updating record flag in {source_table}: {e}")
 
 # Function to insert into override table
 def insert_into_override_table(target_table, primary_key_values, src_ins_ts, amount_old, amount_new):
     try:
-        # Construct the column and value lists for the INSERT statement
-        columns = ", ".join(primary_key_values.keys() + ['src_ins_ts', 'amount_old', 'amount_new', 'insert_ts', 'record_flag'])
+        # Dynamically create the columns and values for the insert statement
+        columns = ", ".join(list(primary_key_values.keys()) + ['src_ins_ts', 'amount_old', 'amount_new', 'insert_ts', 'record_flag'])
         values = ", ".join([f"'{val}'" if isinstance(val, (str, datetime, pd.Timestamp)) else str(val) for val in primary_key_values.values()] + [f"'{src_ins_ts}'", str(amount_old), str(amount_new), "CURRENT_TIMESTAMP()", "'O'"])
 
-        # Construct the INSERT SQL statement
         insert_sql = f"""
             INSERT INTO {target_table} ({columns})
             VALUES ({values})
