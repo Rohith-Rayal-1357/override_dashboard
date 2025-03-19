@@ -64,8 +64,8 @@ def execute_insert_update(selected_table, target_table, join_keys, editable_colu
         join_condition = " AND ".join([f"src.{key} = tgt.{key}" for key in join_keys_list])
 
         # Construct dynamic INSERT query using parameters from the edited row
-        insert_columns = ", ".join(join_keys_list + ['amount', 'record_flag', 'insert_timestamp'])
-        insert_values = ", ".join([f"'{row_data[key]}'" for key in join_keys_list] + [f"'{new_value}'", "'A'", "CURRENT_TIMESTAMP(0)"])
+        insert_columns = ", ".join(join_keys_list + [editable_column, 'record_flag', 'insert_timestamp']) #Corrected INSERT and added editable column
+        insert_values = ", ".join([f"'{row_data[key]}'" for key in join_keys_list] + [f"'{new_value}'", "'A'", "CURRENT_TIMESTAMP(0)"]) #Corrected INSERT and added editable column
 
         insert_sql = f"""
             INSERT INTO {selected_table} ({insert_columns})
@@ -74,25 +74,23 @@ def execute_insert_update(selected_table, target_table, join_keys, editable_colu
                 SELECT 1
                 FROM {selected_table} existing
                 WHERE {join_condition}
-                AND existing.amount = '{new_value}'
+                AND existing.{editable_column} = '{new_value}'
                 AND existing.record_flag = 'A'
             );
         """
-
 
         # Construct dynamic UPDATE query
         update_sql = f"""
             UPDATE {selected_table}
             SET record_flag = 'D'
             WHERE {join_condition}
-            AND amount = '{old_value}'
+            AND {editable_column} = '{old_value}'
             AND record_flag = 'A';
         """
 
         # Execute both INSERT and UPDATE queries
         session.sql(update_sql).collect()
         session.sql(insert_sql).collect()
-
 
         st.success(f"Successfully executed INSERT and UPDATE for table {selected_table}")
 
@@ -112,7 +110,7 @@ def main():
     if module_number and not module_tables_df.empty:
         # Get the module name from the Override_Ref table
         module_name = module_tables_df['MODULE_NAME'].iloc[0]
-        
+
         # Display the module name in a light ice blue box
         st.markdown(f"""
             <div style="background-color: #E0F7FA; padding: 10px; border-radius: 5px; text-align: center; font-size: 16px;">
@@ -124,9 +122,9 @@ def main():
         st.stop()
 
     if not module_tables_df.empty:
-        available_tables = module_tables_df['SOURCE_TABLE'].unique() # Get source tables based on module... # Add select table box
+        available_tables = module_tables_df['SOURCE_TABLE'].unique()  # Get source tables based on module... # Add select table box
         selected_table = st.selectbox("Select Table", available_tables)
-        
+
         # Filter Override_Ref data based on the selected table
         table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
@@ -153,14 +151,28 @@ def main():
 
                     # Make the dataframe editable using st.data_editor
                     edited_df = source_df.copy()
-                    edited_df[editable_column.upper()] = edited_df[editable_column.upper()].astype(str)
+
+                    # Convert the editable column to string type BEFORE styling
+                    editable_column_name = editable_column.upper()
+                    edited_df[editable_column_name] = edited_df[editable_column_name].astype(str)
+
+                    # Add pencil emoji AFTER you convert column to string, before you insert in the data editor
+                    edited_df = edited_df.rename(columns={editable_column_name: f"{editable_column_name} ✏️"})
 
                     # Disable editing for all columns except the selected editable column
-                    column_display_name = f"{editable_column.upper()} ✏️"
+                    column_display_name = f"{editable_column_name} ✏️"
                     disabled_cols = [col for col in edited_df.columns if col != column_display_name]
-                                        
+
+                    # Apply a background color to the editable column
+                    def highlight_editable_column(df, column_name):
+                        styled_df = pd.DataFrame('', index=df.index, columns=df.columns)
+                        styled_df[column_name] = 'background-color: #FFFFE0'  # Light yellow background
+                        return styled_df
+
+                    styled_df = edited_df.style.apply(highlight_editable_column, column_name=column_display_name, axis=None)
+
                     edited_df = st.data_editor(
-                        edited_df,  # Pass the dataframe
+                        styled_df,  # Pass the styled dataframe
                         key=f"data_editor_{selected_table}_{editable_column}",
                         num_rows="dynamic",
                         use_container_width=True,
@@ -171,17 +183,19 @@ def main():
                     if st.button("Submit Updates"):
                         try:
                             # Identify rows that have been edited
-                            edited_column_name = f"{editable_column.upper()} ✏️"
-                            changed_rows = edited_df[edited_df[edited_column_name] != source_df[editable_column.upper()]]
+                            # Use the column with the pencil emoji for comparison
+                            edited_column_name_with_emoji = f"{editable_column_name} ✏️"
+                            changed_rows = edited_df[edited_df[edited_column_name_with_emoji] != source_df[editable_column_name].astype(str)]
 
                             if not changed_rows.empty:
                                 for index, row in changed_rows.iterrows():
                                     # Get the new and old value for the selected column
-                                    new_value = row[edited_column_name]
-                                    old_value = source_df.loc[index, editable_column.upper()]
+                                    new_value = row[edited_column_name_with_emoji]
+                                    old_value = source_df.loc[index, editable_column_name]
+                                    row_data = row.to_dict()
 
                                     # Perform Insert and Update dynamically
-                                    execute_insert_update(selected_table, target_table_name, join_keys, editable_column.upper(), old_value, new_value, row.to_dict())
+                                    execute_insert_update(selected_table, target_table_name, join_keys, editable_column_name, old_value, new_value, row_data) # added parameters
 
                                     # Capture the current timestamp and store it in session state
                                     current_timestamp = datetime.now().strftime('%B %d, %Y %H:%M:%S')
@@ -217,6 +231,7 @@ def main():
     else:
         st.markdown("---")
         st.caption("Portfolio Performance Override System • Last updated: N/A")
+
 
 # Run the main function
 if __name__ == "__main__":
