@@ -42,14 +42,11 @@ def fetch_data(table_name):
         st.error(f"Error fetching data from {table_name}: {e}")
         return pd.DataFrame()
 
-# Function to fetch override ref data based on the selected module
+# Function to fetch override reference data based on the selected module
 def fetch_override_ref_data(selected_module=None):
     try:
         df = session.table("Override_Ref").to_pandas()
         df.columns = [col.upper() for col in df.columns]
-
-        # Debugging: Print the columns of Override_Ref
-        st.write("Columns in Override_Ref:", df.columns)
 
         # Filter based on the selected module if provided
         if selected_module:
@@ -78,7 +75,7 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
     try:
         # Create a copy of row_data to avoid modifying the original DataFrame
         row_data_copy = row_data.copy()
-
+        
         # Remove the editable column from the copied dictionary
         if editable_column.upper() in row_data_copy:
             del row_data_copy[editable_column.upper()]
@@ -90,9 +87,9 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
         # Remove the INSERT_TS column from the copied dictionary
         if 'INSERT_TS' in row_data_copy:
             del row_data_copy['INSERT_TS']
-
+    
         columns = ", ".join(row_data_copy.keys())
-
+        
         # Properly format the values based on their type
         formatted_values = []
         for col, val in row_data_copy.items():
@@ -105,7 +102,7 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
             elif isinstance(val, pd.Timestamp):  # Format Timestamp
                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")  # Snowflake TIMESTAMP format
             elif isinstance(val, datetime):  # Format datetime object
-                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
+                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
             else:
                 formatted_values.append(f"'{str(val)}'")  # Default to string if unknown type
 
@@ -143,7 +140,7 @@ def main():
     if module_number and not module_tables_df.empty:
         # Get the module name from the Override_Ref table
         module_name = module_tables_df['MODULE_NAME'].iloc[0]
-
+        
         # Display the module name in a light ice blue box
         st.markdown(f"""
             <div style="background-color: #E0F7FA; padding: 10px; border-radius: 5px; text-align: center; font-size: 16px;">
@@ -159,7 +156,7 @@ def main():
 
         # Add select table box
         selected_table = st.selectbox("Select Table", available_tables)
-
+        
         # Filter Override_Ref data based on the selected table
         table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
@@ -174,9 +171,8 @@ def main():
             # Display the editable column label below the selectbox
             st.markdown(f"**Editable Column:** {editable_column_upper}")
 
-            # Dynamically determine primary key columns based on Override_Ref
-            primary_key_cols = table_info_df['PRIMARY_KEY_COLS'].iloc[0].split(',')  # Assuming PRIMARY_KEY_COLS contains a comma-separated string
-            st.write("Primary key columns:", primary_key_cols)
+            # Determine primary key columns dynamically based on selected_table
+            primary_key_cols = table_info_df['PRIMARY_KEY_COLUMNS'].iloc[0].split(',')  # Assuming it's a comma-separated list
 
             # Split the data into two tabs
             tab1, tab2 = st.tabs(["Source Data", "Overridden Values"])
@@ -224,7 +220,7 @@ def main():
                             if not changed_rows.empty:
                                 for index, row in changed_rows.iterrows():
                                     # Extract primary key values
-                                    primary_key_values = {col.upper(): row[col] for col in primary_key_cols}
+                                    primary_key_values = {col: row[col] for col in primary_key_cols}
 
                                     # Get new value for the selected column
                                     new_value = row[f"{editable_column_upper} ✏️"]
@@ -233,7 +229,7 @@ def main():
                                     # Get the old insert timestamp
                                     src_ins_ts = str(source_df.loc[index, 'INSERT_TS'])
 
-                                    # Extract other fields for override table
+                                    # Before updating we need to extract current record values from source table.
                                     asofdate = row['ASOFDATE']
                                     segment = row['SEGMENT']
                                     category = row['CATEGORY']
