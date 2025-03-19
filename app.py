@@ -152,7 +152,7 @@ def main():
         st.stop()
 
     if not module_tables_df.empty:
-        available_tables = module_tables_df['SOURCE_TABLE'].unique() # Get source tables based on module
+        available_tables = module_tables_df['SOURCE_TABLE'].unique()  # Get source tables based on module
 
         # Add select table box
         selected_table = st.selectbox("Select Table", available_tables)
@@ -173,6 +173,8 @@ def main():
 
             # Determine primary key columns dynamically based on selected_table
             if selected_table == 'portfolio_perf':
+                primary_key_cols = ['ASOFDATE', 'SEGMENT', 'CATEGORY']
+            elif selected_table == 'fact_msme':
                 primary_key_cols = ['ASOFDATE', 'SEGMENT', 'CATEGORY']
             else:
                 st.error("Primary key columns not defined for this table. Please update the code.")
