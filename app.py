@@ -193,10 +193,8 @@ def main():
                     # Make the dataframe editable using st.data_editor
                     edited_df = source_df.copy()
 
-                    # Add the pencil symbol (✏️) next to the editable column's values
-                    edited_df[editable_column_upper] = edited_df[editable_column_upper].apply(
-                        lambda x: f"{x} ✏️"
-                    )
+                    # Modify column header to add pencil icon in the editable column
+                    edited_df = edited_df.rename(columns={editable_column_upper: f"{editable_column_upper} ✏️"})
 
                     # Apply a background color to the editable column
                     def highlight_editable_column(df, column_name):
@@ -205,9 +203,9 @@ def main():
                         return styled_df
 
                     # Disable editing for all columns except the selected editable column
-                    disabled_cols = [col for col in edited_df.columns if col != editable_column_upper]
+                    disabled_cols = [col for col in edited_df.columns if col != f"{editable_column_upper} ✏️"]
 
-                    styled_df = edited_df.style.apply(highlight_editable_column, column_name=editable_column_upper, axis=None)
+                    styled_df = edited_df.style.apply(highlight_editable_column, column_name=f"{editable_column_upper} ✏️", axis=None)
 
                     edited_df = st.data_editor(
                         styled_df,  # Pass the styled dataframe
@@ -221,7 +219,7 @@ def main():
                     if st.button("Submit Updates"):
                         try:
                             # Identify rows that have been edited
-                            changed_rows = edited_df[edited_df[editable_column_upper] != source_df[editable_column_upper]]
+                            changed_rows = edited_df[edited_df[f"{editable_column_upper} ✏️"] != source_df[editable_column_upper]]
 
                             if not changed_rows.empty:
                                 for index, row in changed_rows.iterrows():
@@ -229,7 +227,7 @@ def main():
                                     primary_key_values = {col: row[col] for col in primary_key_cols}
 
                                     # Get new value for the selected column
-                                    new_value = row[editable_column_upper]
+                                    new_value = row[f"{editable_column_upper} ✏️"]
                                     old_value = source_df.loc[index, editable_column_upper]
 
                                     # Get the old insert timestamp
