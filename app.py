@@ -42,7 +42,7 @@ def fetch_data(table_name):
         st.error(f"Error fetching data from {table_name}: {e}")
         return pd.DataFrame()
 
-# Function to fetch override reference data based on the selected module
+# Function to fetch override ref data based on the selected module
 def fetch_override_ref_data(selected_module=None):
     try:
         df = session.table("Override_Ref").to_pandas()
@@ -56,19 +56,6 @@ def fetch_override_ref_data(selected_module=None):
         st.error(f"Error fetching data from Override_Ref: {e}")
         return pd.DataFrame()
 
-# Function to update record flag in source table
-def update_source_table_record_flag(source_table, primary_key_values):
-    try:
-        where_clause = " AND ".join([f"{col} = '{val}'" for col, val in primary_key_values.items()])
-        update_sql = f"""
-            UPDATE {source_table}
-            SET record_flag = 'D',
-                insert_ts = CURRENT_TIMESTAMP()
-            WHERE {where_clause}
-        """
-        session.sql(update_sql).collect()
-    except Exception as e:
-        st.error(f"Error updating record flag in {source_table}: {e}")
 
 # Function to insert new row in source table
 def insert_into_source_table(source_table, row_data, new_value, editable_column):
@@ -115,6 +102,19 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
         session.sql(insert_sql).collect()
     except Exception as e:
         st.error(f"Error inserting into {source_table}: {e}")
+# Function to update record flag in source table
+def update_source_table_record_flag(source_table, primary_key_values):
+    try:
+        where_clause = " AND ".join([f"{col} = '{val}'" for col, val in primary_key_values.items()])
+        update_sql = f"""
+            UPDATE {source_table}
+            SET record_flag = 'D',
+                insert_ts = CURRENT_TIMESTAMP()
+            WHERE {where_clause}
+        """
+        session.sql(update_sql).collect()
+    except Exception as e:
+        st.error(f"Error updating record flag in {source_table}: {e}")
 
 # Function to insert into override table
 def insert_into_override_table(target_table, asofdate, segment, category, src_ins_ts, amount_old, amount_new):
@@ -152,7 +152,7 @@ def main():
         st.stop()
 
     if not module_tables_df.empty:
-        available_tables = module_tables_df['SOURCE_TABLE'].unique()  # Get source tables based on module
+        available_tables = module_tables_df['SOURCE_TABLE'].unique() # Get source tables based on module
 
         # Add select table box
         selected_table = st.selectbox("Select Table", available_tables)
@@ -172,7 +172,11 @@ def main():
             st.markdown(f"**Editable Column:** {editable_column_upper}")
 
             # Determine primary key columns dynamically based on selected_table
-            primary_key_cols = table_info_df['PRIMARY_KEY_COLUMNS'].iloc[0].split(',')  # Assuming it's a comma-separated list
+            if selected_table == 'portfolio_perf':
+                primary_key_cols = ['ASOFDATE', 'SEGMENT', 'CATEGORY']
+            else:
+                st.error("Primary key columns not defined for this table. Please update the code.")
+                st.stop()
 
             # Split the data into two tabs
             tab1, tab2 = st.tabs(["Source Data", "Overridden Values"])
