@@ -51,7 +51,6 @@ def fetch_override_ref_data(selected_module=None):
         # Filter based on the selected module if provided
         if selected_module:
             df = df[df['MODULE'] == int(selected_module)]
-
         return df
     except Exception as e:
         st.error(f"Error fetching data from Override_Ref: {e}")
@@ -74,33 +73,38 @@ def update_source_table_record_flag(source_table, primary_key_values):
 # Function to insert new row in source table
 def insert_into_source_table(source_table, row_data, new_value, editable_column):
     try:
+        # Create a copy of row_data to avoid modifying the original DataFrame
         row_data_copy = row_data.copy()
-
+        
+        # Remove the editable column from the copied dictionary
         if editable_column.upper() in row_data_copy:
             del row_data_copy[editable_column.upper()]
 
+        # Remove the RECORD_FLAG column from the copied dictionary
         if 'RECORD_FLAG' in row_data_copy:
             del row_data_copy['RECORD_FLAG']
 
+        # Remove the INSERT_TS column from the copied dictionary
         if 'INSERT_TS' in row_data_copy:
             del row_data_copy['INSERT_TS']
-
+    
         columns = ", ".join(row_data_copy.keys())
-
+        
+        # Properly format the values based on their type
         formatted_values = []
         for col, val in row_data_copy.items():
             if isinstance(val, str):
                 formatted_values.append(f"'{val}'")
-            elif pd.isna(val):
+            elif pd.isna(val):  # Handle potential NaN values, converting to NULL
                 formatted_values.append("NULL")
             elif isinstance(val, (int, float)):
                 formatted_values.append(str(val))
-            elif isinstance(val, pd.Timestamp):
-                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
-            elif isinstance(val, datetime):
-                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
+            elif isinstance(val, pd.Timestamp):  # Format Timestamp
+                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")  # Snowflake TIMESTAMP format
+            elif isinstance(val, datetime):  # Format datetime object
+                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
             else:
-                formatted_values.append(f"'{str(val)}'")
+                formatted_values.append(f"'{str(val)}'")  # Default to string if unknown type
 
         values = ", ".join(formatted_values)
 
@@ -125,25 +129,32 @@ def insert_into_override_table(target_table, asofdate, segment, category, src_in
 
 # Main app
 def main():
-    # Get module from URL
-    query_params = st.experimental_get_query_params()
-    module_number = query_params.get("module", [None])[0]
+    # Title with custom styling
+    st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
 
-    # Display Module Name
-    if module_number:
-        st.markdown(f"<h2 style='text-align: center;'>Module: {module_number}</h2>", unsafe_allow_html=True)
-    else:
-        st.info("Please select a module from Power BI.")
-        st.stop()
+    # Get module from URL
+    query_params = st.query_params
+    module_number = query_params.get("module", None)
 
     # Get tables for the selected module
     module_tables_df = fetch_override_ref_data(module_number)
 
-    if not module_tables_df.empty:
-        available_tables = module_tables_df['SOURCE_TABLE'].unique()
-        selected_table = st.selectbox("Select Table", available_tables)
+    # Display Module Name
+    if module_number and not module_tables_df.empty:
+        # Get the module name from the Override_Ref table
+        module_name = module_tables_df['MODULE_NAME'].iloc[0]
+        st.markdown(f"<h2 style='text-align: center;'>Module: {module_name}</h2>", unsafe_allow_html=True)
+    else:
+        st.info("Please select a module from Power BI.")
+        st.stop()
 
-        # Filter Override_Ref data based on the selected table
+    if not module_tables_df.empty:
+
+        available_tables = module_tables_df['SOURCE_TABLE'].unique() #Get source tables based on module
+        
+        selected_table = available_tables[0] #This takes the first sourcetable name for module
+        
+        #Filter Override_Ref data based on the selected table
         table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
         if not table_info_df.empty:
@@ -236,24 +247,24 @@ def main():
 
                         except Exception as e:
                             st.error(f"Error during update/insert: {e}")
-            else:
-                st.info(f"No data available in {selected_table}.")
-                
+                else:
+                    st.info(f"No data available in {selected_table}.")
+
+            with tab2:
+                st.subheader(f"Overridden Values from {target_table_name}")
+
+                # Fetch overridden data
+                override_df = fetch_data(target_table_name)
+                if not override_df.empty:
+                    st.dataframe(override_df, use_container_width=True)
+                else:
+                    st.info(f"No overridden data available in {target_table_name}.")
+
         else:
-            st.warning(f"No table information found for selected module {module_number}.")
-
-        with tab2:
-            st.subheader(f"Overridden Values from {target_table_name}")
-
-            # Fetch overridden data
-            override_df = fetch_data(target_table_name)
-            if not override_df.empty:
-                st.dataframe(override_df, use_container_width=True)
-            else:
-                st.info(f"No overridden data available in {target_table_name}.")
+            st.warning("No table information found in Override_Ref for the selected table.")
     else:
-        st.warning("No table information found in Override_Ref for the selected module.")
-    
+        st.warning("No tables found for the selected module in Override_Ref table.")
+
 # Run the main function
 if __name__ == "__main__":
     main()
