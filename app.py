@@ -130,7 +130,7 @@ def insert_into_override_table(target_table, asofdate, segment, category, src_in
 # Main app
 def main():
     # Title with custom styling
-    st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
+    # st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
 
     # Get module from URL
     query_params = st.query_params
