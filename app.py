@@ -48,6 +48,9 @@ def fetch_override_ref_data(selected_module=None):
         df = session.table("Override_Ref").to_pandas()
         df.columns = [col.upper() for col in df.columns]
 
+        # Debugging: Print the columns of Override_Ref
+        st.write("Columns in Override_Ref:", df.columns)
+
         # Filter based on the selected module if provided
         if selected_module:
             df = df[df['MODULE'] == int(selected_module)]
@@ -173,6 +176,7 @@ def main():
 
             # Dynamically determine primary key columns based on Override_Ref
             primary_key_cols = table_info_df['PRIMARY_KEY_COLS'].iloc[0].split(',')  # Assuming PRIMARY_KEY_COLS contains a comma-separated string
+            st.write("Primary key columns:", primary_key_cols)
 
             # Split the data into two tabs
             tab1, tab2 = st.tabs(["Source Data", "Overridden Values"])
