@@ -7,7 +7,7 @@ from datetime import datetime
 st.set_page_config(
     page_title="Editable Data Override App",
     page_icon="📊",
-    layout="centered"  # Making the layout wider for better visuals
+    layout="centered"
 )
 
 # Title with custom styling
@@ -129,6 +129,9 @@ def insert_into_override_table(target_table, asofdate, segment, category, src_in
 
 # Main app
 def main():
+    # Title with custom styling
+    #st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
+
     # Get module from URL
     query_params = st.query_params
     module_number = query_params.get("module", None)
@@ -138,6 +141,7 @@ def main():
 
     # Display Module Name
     if module_number and not module_tables_df.empty:
+        # Get the module name from the Override_Ref table
         module_name = module_tables_df['MODULE_NAME'].iloc[0]
         st.markdown(f"<h2 style='text-align: center;'>Module: {module_name}</h2>", unsafe_allow_html=True)
     else:
@@ -146,12 +150,12 @@ def main():
 
     if not module_tables_df.empty:
 
-        available_tables = module_tables_df['SOURCE_TABLE'].unique() # Get source tables based on the module
+        available_tables = module_tables_df['SOURCE_TABLE'].unique() #Get source tables based on module
 
-        # Add select table box
-        selected_table = st.selectbox("Select Table", available_tables, key="table_select")
+        #Add select table box
+        selected_table = st.selectbox("Select Table", available_tables)
         
-        # Filter Override_Ref data based on the selected table
+        #Filter Override_Ref data based on the selected table
         table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
         if not table_info_df.empty:
@@ -177,7 +181,6 @@ def main():
 
             with tab1:
                 st.subheader(f"Source Data from {selected_table}")
-                st.info("Please review and edit the values below:")
 
                 # Fetch data at the beginning
                 source_df = fetch_data(selected_table)
@@ -185,19 +188,20 @@ def main():
                     # Retain only 'A' records
                     source_df = source_df[source_df['RECORD_FLAG'] == 'A'].copy()
 
-                    # Apply highlight to the edited column
+                    # Make the dataframe editable using st.data_editor
+                    edited_df = source_df.copy()
+
+                    # Apply a background color to the editable column
                     def highlight_editable_column(df, column_name):
                         styled_df = pd.DataFrame('', index=df.index, columns=df.columns)
-                        styled_df[column_name] = 'background-color: #FFFFE0'  # Yellow highlight for editing
+                        styled_df[column_name] = 'background-color: #FFFFE0'
                         return styled_df
 
                     # Disable editing for all columns except the selected editable column
-                    disabled_cols = [col for col in source_df.columns if col != editable_column_upper]
+                    disabled_cols = [col for col in edited_df.columns if col != editable_column_upper]
 
-                    # Apply the background styling
-                    styled_df = source_df.style.apply(highlight_editable_column, column_name=editable_column_upper, axis=None)
+                    styled_df = edited_df.style.apply(highlight_editable_column, column_name=editable_column_upper, axis=None)
 
-                    # Use Streamlit's data editor with styling
                     edited_df = st.data_editor(
                         styled_df,  # Pass the styled dataframe
                         key=f"data_editor_{selected_table}_{editable_column}",
@@ -206,44 +210,44 @@ def main():
                         disabled=disabled_cols
                     )
 
-                    # Submit button to update the source table and insert into the target table
-                    with st.spinner("Updating data..."):
-                        if st.button("Submit Updates", key="submit_updates"):
-                            try:
-                                # Identify rows that have been edited
-                                changed_rows = edited_df[edited_df[editable_column_upper] != source_df[editable_column_upper]]
+                    # Submit button to update the source table and insert to the target table
+                    if st.button("Submit Updates"):
+                        try:
+                            # Identify rows that have been edited
+                            changed_rows = edited_df[edited_df[editable_column_upper] != source_df[editable_column_upper]]
 
-                                if not changed_rows.empty:
-                                    for index, row in changed_rows.iterrows():
-                                        # Extract primary key values
-                                        primary_key_values = {col: row[col] for col in primary_key_cols}
+                            if not changed_rows.empty:
+                                for index, row in changed_rows.iterrows():
+                                    # Extract primary key values
+                                    primary_key_values = {col: row[col] for col in primary_key_cols}
 
-                                        # Get new value for the selected column
-                                        new_value = row[editable_column_upper]
-                                        old_value = source_df.loc[index, editable_column_upper]
+                                    # Get new value for the selected column
+                                    new_value = row[editable_column_upper]
+                                    old_value = source_df.loc[index, editable_column_upper]
 
-                                        # Get the old insert timestamp
-                                        src_ins_ts = str(source_df.loc[index, 'INSERT_TS'])
+                                    # Get the old insert timestamp
+                                    src_ins_ts = str(source_df.loc[index, 'INSERT_TS'])
 
-                                        # Before updating we need extract current record values from source table.
-                                        asofdate = row['ASOFDATE']
-                                        segment = row['SEGMENT']
-                                        category = row['CATEGORY']
+                                    # Before updating we need extract current record values from source table.
+                                    asofdate = row['ASOFDATE']
+                                    segment = row['SEGMENT']
+                                    category = row['CATEGORY']
 
-                                        # 1. Mark the old record as 'D'
-                                        update_source_table_record_flag(selected_table, primary_key_values)
+                                    # 1. Mark the old record as 'D'
+                                    update_source_table_record_flag(selected_table, primary_key_values)
 
-                                        # 2. Insert the new record with 'A'
-                                        insert_into_source_table(selected_table, source_df.loc[index].to_dict(), new_value, editable_column)
+                                    # 2. Insert the new record with 'A'
+                                    insert_into_source_table(selected_table, source_df.loc[index].to_dict(), new_value, editable_column)
 
-                                        # 3. Insert into override table
-                                        insert_into_override_table(target_table_name, asofdate, segment, category, src_ins_ts, old_value, new_value)
+                                    # 3. Insert into override table
+                                    insert_into_override_table(target_table_name, asofdate, segment, category, src_ins_ts, old_value, new_value)
 
-                                    st.success("Data updated successfully!")
-                                else:
-                                    st.info("No changes were made.")
-                            except Exception as e:
-                                st.error(f"Error during update/insert: {e}")
+                                st.success("Data updated successfully!")
+                            else:
+                                st.info("No changes were made.")
+
+                        except Exception as e:
+                            st.error(f"Error during update/insert: {e}")
                 else:
                     st.info(f"No data available in {selected_table}.")
 
@@ -256,6 +260,7 @@ def main():
                     st.dataframe(override_df, use_container_width=True)
                 else:
                     st.info(f"No overridden data available in {target_table_name}.")
+
         else:
             st.warning("No table information found in Override_Ref for the selected table.")
     else:
