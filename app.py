@@ -130,7 +130,7 @@ def insert_into_override_table(target_table, asofdate, segment, category, src_in
 # Main app
 def main():
     # Title with custom styling
-    # st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
 
     # Get module from URL
     query_params = st.query_params
@@ -151,8 +151,9 @@ def main():
     if not module_tables_df.empty:
 
         available_tables = module_tables_df['SOURCE_TABLE'].unique() #Get source tables based on module
-        
-        selected_table = available_tables[0] #This takes the first sourcetable name for module
+
+        #Add select table box
+        selected_table = st.selectbox("Select Table", available_tables)
         
         #Filter Override_Ref data based on the selected table
         table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
