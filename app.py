@@ -10,9 +10,6 @@ st.set_page_config(
     layout="centered"
 )
 
-# Title with custom styling
-st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
-
 # Retrieve Snowflake credentials from Streamlit secrets
 try:
     connection_parameters = {
@@ -42,16 +39,22 @@ def fetch_data(table_name):
         st.error(f"Error fetching data from {table_name}: {e}")
         return pd.DataFrame()
 
-# Function to fetch override ref data based on the selected module
-def fetch_override_ref_data(selected_module=None):
+# Function to fetch override ref data based on the selected modules
+def fetch_override_ref_data(selected_modules=None):
     try:
         df = session.table("Override_Ref").to_pandas()
         df.columns = [col.upper() for col in df.columns]
 
-        # Filter based on the selected module if provided
-        if selected_module:
-            module_num = int(selected_module.split('-')[1])
-            df = df[df['MODULE'] == module_num]
+        # Filter based on the selected modules if provided
+        if selected_modules:
+            # Split the comma-separated string into a list of modules
+            module_list = selected_modules.split(',')
+            # Remove any empty strings from the list (handles the "")
+            module_list = [module.strip() for module in module_list if module.strip()]
+
+            #Filter by module Name
+            df = df[df['MODULE_NAME'].isin(module_list)]
+
         return df
     except Exception as e:
         st.error(f"Error fetching data from Override_Ref: {e}")
@@ -135,19 +138,17 @@ def main():
 
     # Get module from URL
     query_params = st.query_params
-    module_name = query_params.get("module", None)
+    module_names = query_params.get("module", None)  # Get the comma-separated string
 
     # Display Module Name
-    if module_name:
-        st.markdown(f"<h2 style='text-align: center;'>Module: {module_name}</h2>", unsafe_allow_html=True)
-        selected_module = f"Module-{module_name.split('_')[1]}"
+    if module_names:
+        st.markdown(f"<h2 style='text-align: center;'>Modules: {module_names}</h2>", unsafe_allow_html=True)  #Display the modules in the title
     else:
-        selected_module = None
-        st.info("Please select a module.")
+        st.info("Please select a module from Power BI.")
         st.stop()
 
     # Get tables for the selected module
-    module_tables_df = fetch_override_ref_data(selected_module)
+    module_tables_df = fetch_override_ref_data(module_names) #pass the string of modules
 
     if not module_tables_df.empty:
         available_tables = module_tables_df['SOURCE_TABLE'].unique()
