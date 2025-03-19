@@ -2,16 +2,6 @@ import streamlit as st
 import pandas as pd
 from snowflake.snowpark import Session
 from datetime import datetime
-from urllib.parse import urlparse, parse_qs
-
-# Function to get module name from URL
-def get_module_from_url():
-    try:
-        parsed_url = urlparse(st.experimental_get_query_params()['module'][0])
-        module_name = parse_qs(parsed_url.query)['module_name'][0]
-        return module_name
-    except:
-        return None
 
 # Page configuration
 st.set_page_config(
@@ -19,6 +9,9 @@ st.set_page_config(
     page_icon="📊",
     layout="centered"
 )
+
+# Title with custom styling
+st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
 
 # Retrieve Snowflake credentials from Streamlit secrets
 try:
@@ -83,7 +76,7 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
     try:
         # Create a copy of row_data to avoid modifying the original DataFrame
         row_data_copy = row_data.copy()
-        
+
         # Remove the editable column from the copied dictionary
         if editable_column.upper() in row_data_copy:
             del row_data_copy[editable_column.upper()]
@@ -95,9 +88,9 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
         # Remove the INSERT_TS column from the copied dictionary
         if 'INSERT_TS' in row_data_copy:
             del row_data_copy['INSERT_TS']
-    
+
         columns = ", ".join(row_data_copy.keys())
-        
+
         # Properly format the values based on their type
         formatted_values = []
         for col, val in row_data_copy.items():
@@ -110,7 +103,7 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
             elif isinstance(val, pd.Timestamp):  # Format Timestamp
                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")  # Snowflake TIMESTAMP format
             elif isinstance(val, datetime):  # Format datetime object
-                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
+                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
             else:
                 formatted_values.append(f"'{str(val)}'")  # Default to string if unknown type
 
@@ -141,7 +134,8 @@ def main():
     st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
 
     # Get module from URL
-    module_name = get_module_from_url()
+    query_params = st.query_params
+    module_name = query_params.get("module", None)
 
     # Display Module Name
     if module_name:
@@ -170,7 +164,10 @@ def main():
             editable_column_upper = editable_column.upper()
 
             # Display the editable column in a disabled selectbox
-            st.selectbox("Editable Column", [editable_column], disabled=True)
+            st.selectbox("Editable Column", [editable_column], disabled=True, key="editable_column_selectbox")
+
+            # Display the editable column label below the selectbox
+            st.markdown(f"**Editable Column:** {editable_column_upper}")
 
             # Determine primary key columns dynamically based on selected_table
             if selected_table == 'portfolio_perf':
@@ -227,7 +224,7 @@ def main():
                                     # Get new value for the selected column
                                     new_value = row[editable_column_upper]
                                     old_value = source_df.loc[index, editable_column_upper]
-                                    
+
                                     # Get the old insert timestamp
                                     src_ins_ts = str(source_df.loc[index, 'INSERT_TS'])
 
