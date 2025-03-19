@@ -51,7 +51,6 @@ def fetch_override_ref_data(selected_module=None):
         # Filter based on the selected module if provided
         if selected_module:
             df = df[df['MODULE'] == int(selected_module)]
-
         return df
     except Exception as e:
         st.error(f"Error fetching data from Override_Ref: {e}")
@@ -76,7 +75,7 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
     try:
         # Create a copy of row_data to avoid modifying the original DataFrame
         row_data_copy = row_data.copy()
-
+        
         # Remove the editable column from the copied dictionary
         if editable_column.upper() in row_data_copy:
             del row_data_copy[editable_column.upper()]
@@ -88,9 +87,9 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
         # Remove the INSERT_TS column from the copied dictionary
         if 'INSERT_TS' in row_data_copy:
             del row_data_copy['INSERT_TS']
-
+    
         columns = ", ".join(row_data_copy.keys())
-
+        
         # Properly format the values based on their type
         formatted_values = []
         for col, val in row_data_copy.items():
@@ -103,7 +102,7 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
             elif isinstance(val, pd.Timestamp):  # Format Timestamp
                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")  # Snowflake TIMESTAMP format
             elif isinstance(val, datetime):  # Format datetime object
-                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
+                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
             else:
                 formatted_values.append(f"'{str(val)}'")  # Default to string if unknown type
 
@@ -148,13 +147,19 @@ def main():
     module_tables_df = fetch_override_ref_data(module_number)
 
     if not module_tables_df.empty:
-        # Filter Override_Ref data based on the selected table
-        # table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table] #No need to filter
 
-        available_tables = module_tables_df['SOURCE_TABLE'].unique()
-        selected_table = st.selectbox("Select Table", available_tables)
+        available_tables = module_tables_df['SOURCE_TABLE'].unique() #Get source tables based on module
+        
+        #Here you want to allow user filter based on the source table? If so, let's keep it here, but
+        #If no, then skip this part. And I am skipping it for now.
+        #selected_table = st.selectbox("Select Table", available_tables)
 
-        # Filter Override_Ref data based on the selected table
+        #Since we filter to the "table_info_df" with the first source table,
+        #Let's grab the first source table name, assuming there will be always one.
+        #But we don't want to have the user select again with st.selectbox since it is not needed here
+        selected_table = available_tables[0] #This takes the first sourcetable name for module
+        
+        #Filter Override_Ref data based on the selected table
         table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
         if not table_info_df.empty:
@@ -247,23 +252,23 @@ def main():
 
                         except Exception as e:
                             st.error(f"Error during update/insert: {e}")
-            else:
-                st.info(f"No data available in {selected_table}.")
+                else:
+                    st.info(f"No data available in {selected_table}.")
 
-        with tab2:
-            st.subheader(f"Overridden Values from {target_table_name}")
+            with tab2:
+                st.subheader(f"Overridden Values from {target_table_name}")
 
-            # Fetch overridden data
-            override_df = fetch_data(target_table_name)
-            if not override_df.empty:
-                st.dataframe(override_df, use_container_width=True)
-            else:
-                st.info(f"No overridden data available in {target_table_name}.")
+                # Fetch overridden data
+                override_df = fetch_data(target_table_name)
+                if not override_df.empty:
+                    st.dataframe(override_df, use_container_width=True)
+                else:
+                    st.info(f"No overridden data available in {target_table_name}.")
 
+        else:
+            st.warning("No table information found in Override_Ref for the selected table.")
     else:
-        st.warning("No table information found in Override_Ref for the selected table.")
-    
-# Need to close the first if-statment
+        st.warning("No tables found for the selected module in Override_Ref table.")
 
 # Run the main function
 if __name__ == "__main__":
