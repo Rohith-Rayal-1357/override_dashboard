@@ -56,6 +56,20 @@ def fetch_override_ref_data(selected_module=None):
         st.error(f"Error fetching data from Override_Ref: {e}")
         return pd.DataFrame()
 
+# Function to fetch the latest update timestamp from the selected table
+def fetch_latest_update_timestamp(table_name):
+    try:
+        query = f"""
+            SELECT MAX(insert_ts) AS latest_update
+            FROM {table_name}
+        """
+        result = session.sql(query).to_pandas()
+        latest_update = result['LATEST_UPDATE'].iloc[0]
+        return latest_update
+    except Exception as e:
+        st.error(f"Error fetching latest update timestamp from {table_name}: {e}")
+        return None
+
 # Function to update record flag in source table
 def update_source_table_record_flag(source_table, primary_key_values):
     try:
@@ -130,7 +144,7 @@ def insert_into_override_table(target_table, asofdate, segment, category, src_in
 # Main app
 def main():
     # Title with custom styling
-    #st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
 
     # Get module from URL
     query_params = st.query_params
@@ -148,14 +162,24 @@ def main():
         st.info("Please select a module from Power BI.")
         st.stop()
 
+    # Fetch and display the last updated timestamp
     if not module_tables_df.empty:
+        selected_table = module_tables_df['SOURCE_TABLE'].iloc[0]  # Get the first table for example
+        last_updated = fetch_latest_update_timestamp(selected_table)
 
-        available_tables = module_tables_df['SOURCE_TABLE'].unique() #Get source tables based on module
+        if last_updated:
+            st.markdown(f"""
+                <div style="background-color: #E0F7FA; padding: 10px; border-radius: 5px; text-align: center; font-size: 16px;">
+                    <strong>Last Updated:</strong> {last_updated}
+                </div>
+            """, unsafe_allow_html=True)
 
-        #Add select table box
+        available_tables = module_tables_df['SOURCE_TABLE'].unique()
+
+        # Add select table box
         selected_table = st.selectbox("Select Table", available_tables)
-        
-        #Filter Override_Ref data based on the selected table
+
+        # Filter Override_Ref data based on the selected table
         table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
         if not table_info_df.empty:
@@ -260,7 +284,6 @@ def main():
                     st.dataframe(override_df, use_container_width=True)
                 else:
                     st.info(f"No overridden data available in {target_table_name}.")
-
         else:
             st.warning("No table information found in Override_Ref for the selected table.")
     else:
