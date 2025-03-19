@@ -13,27 +13,31 @@ st.set_page_config(
 # Title with custom styling
 st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
 
-# --- Snowflake Connection ---
-# Retrieve Snowflake credentials from Streamlit secrets
-try:
-    connection_parameters = {
-        "account": st.secrets["SNOWFLAKE_ACCOUNT"],
-        "user": st.secrets["SNOWFLAKE_USER"],
-        "password": st.secrets["SNOWFLAKE_PASSWORD"],
-        "warehouse": st.secrets["SNOWFLAKE_WAREHOUSE"],
-        "database": st.secrets["SNOWFLAKE_DATABASE"],
-        "schema": st.secrets["SNOWFLAKE_SCHEMA"],
-    }
+# Snowflake connection parameters from Streamlit secrets
+sf_config = {
+    "account": st.secrets["snowflake"]["SNOWFLAKE_ACCOUNT"],
+    "user": st.secrets["snowflake"]["SNOWFLAKE_USER"],
+    "password": st.secrets["snowflake"]["SNOWFLAKE_PASSWORD"],
+    "warehouse": st.secrets["snowflake"]["SNOWFLAKE_WAREHOUSE"],
+    "database": st.secrets["snowflake"]["SNOWFLAKE_DATABASE"],
+    "schema": st.secrets["snowflake"]["SNOWFLAKE_SCHEMA"]
+}
 
-    # ✅ Create a Snowpark session
-    session = Session.builder.configs(connection_parameters).create()
-    st.success("✅ Successfully connected to Snowflake!")
+# Get Snowflake session
+def get_sf_session():
+    try:
+        session = Session.builder.configs(sf_config).create()
+        return session
+    except Exception as e:
+        st.error(f"Error establishing Snowflake session: {e}")
+        return None
 
-except Exception as e:
-    st.error(f"❌ Failed to connect to Snowflake: {e}")
+session = get_sf_session()
+
+if session is None:
+    st.error("Unable to establish a Snowflake session. Please check your credentials and try again.")
     st.stop()
 
-# --- Data Fetching Functions ---
 # Function to fetch data based on the table name
 def fetch_data(table_name):
     try:
@@ -52,13 +56,13 @@ def fetch_override_ref_data(selected_module=None):
 
         # Filter based on the selected module if provided
         if selected_module:
-            df = df[df['MODULE'] == int(selected_module)]  # Use integer module number
+            module_num = int(selected_module.split('-')[1])
+            df = df[df['MODULE'] == module_num]
         return df
     except Exception as e:
         st.error(f"Error fetching data from Override_Ref: {e}")
         return pd.DataFrame()
 
-# --- Data Manipulation Functions ---
 # Function to update record flag in source table
 def update_source_table_record_flag(source_table, primary_key_values):
     try:
@@ -130,46 +134,29 @@ def insert_into_override_table(target_table, asofdate, segment, category, src_in
     except Exception as e:
         st.error(f"Error inserting into {target_table}: {e}")
 
-# --- Main app logic ---
-# Retrieve the query parameters using the correct method
-query_params = st.query_params
-
-# Check if the 'module' parameter exists in the URL
-if 'module' in query_params:
-    selected_module = query_params['module'][0]  # Get the module from the URL
+# Main app
+# List available modules - Dynamically populate from Override_Ref
+override_ref_df = fetch_data("Override_Ref")
+if not override_ref_df.empty:
+    module_numbers = sorted(override_ref_df['MODULE'].unique())
+    available_modules = [f"Module-{int(module)}" for module in module_numbers]
 else:
-    selected_module = None  # No module is selected
+    available_modules = []
+    st.warning("No modules found in Override_Ref table.")
 
-# Error handling: If no module is selected, display an error message and stop.
-if selected_module is None:
-    st.error("Please select a module from the Power BI report.")
-    st.stop()
+# Select module
+selected_module = st.selectbox("Select Module", available_modules)
 
-try:
-    selected_module = int(selected_module)  # Convert to integer
-except ValueError:
-    st.error("Invalid module number. Please ensure the module number is an integer.")
-    st.stop()
-
-# Fetch the module tables based on the selected module
+# Get tables for the selected module
 module_tables_df = fetch_override_ref_data(selected_module)
 
-# Check if module data exists for the selected module
-if module_tables_df.empty:
-    st.error(f"Module {selected_module} does not exist in Override_Ref. No data to display.")
-    st.stop()
-
-module_name = module_tables_df['MODULE_NAME'].iloc[0]
-st.markdown(f"<h3 style='text-align: center;'>Module: {module_name}</h3>", unsafe_allow_html=True)
-
-# Show tables for the selected module
 if not module_tables_df.empty:
     available_tables = module_tables_df['SOURCE_TABLE'].unique()
 
     # Select table within the module
     selected_table = st.selectbox("Select Table", available_tables)
 
-    # Filter the data to the selected table
+    # Filter Override_Ref data based on the selected table
     table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
     if not table_info_df.empty:
@@ -240,6 +227,7 @@ if not module_tables_df.empty:
                                 asofdate = row['ASOFDATE']
                                 segment = row['SEGMENT']
                                 category = row['CATEGORY']
+
 
                                 # 1. Mark the old record as 'D'
                                 update_source_table_record_flag(selected_table, primary_key_values)
