@@ -56,76 +56,42 @@ def fetch_override_ref_data(selected_module=None):
         st.error(f"Error fetching data from Override_Ref: {e}")
         return pd.DataFrame()
 
-# Function to update record flag in source table
-def update_source_table_record_flag(source_table, primary_key_values):
+# Function to execute dynamic INSERT and UPDATE based on join_keys
+def execute_insert_update(selected_table, target_table, join_keys, editable_column):
     try:
-        where_clause = " AND ".join([f"{col} = '{val}'" for col, val in primary_key_values.items()])
+        # Convert join_keys to list and build ON conditions dynamically
+        join_keys_list = eval(join_keys)  # Convert string to list {asofdate, segment, category}
+        join_condition = " AND ".join([f"src.{key} = tgt.{key}" for key in join_keys_list])
+
+        # Construct dynamic INSERT query
+        insert_sql = f"""
+            INSERT INTO {selected_table} (asofdate, segment, category, amount, record_flag, insert_ts)
+            SELECT     tgt.asofdate, tgt.segment, tgt.category, tgt.amount_new,  'A', CURRENT_TIMESTAMP(0)
+            FROM {target_table} tgt
+            JOIN {selected_table} src
+            ON {join_condition} 
+            AND src.{editable_column} = tgt.amount_old
+            AND src.record_flag = 'A';
+        """
+
+        # Construct dynamic UPDATE query
         update_sql = f"""
-            UPDATE {source_table}
-            SET record_flag = 'D',
-                insert_ts = CURRENT_TIMESTAMP()
-            WHERE {where_clause}
+            UPDATE {selected_table} src
+            SET record_flag = 'D'
+            FROM {target_table} tgt
+            WHERE {join_condition} 
+            AND src.{editable_column} = tgt.amount_old
+            AND src.record_flag = 'A';
         """
+
+        # Execute both INSERT and UPDATE queries
+        session.sql(insert_sql).collect()
         session.sql(update_sql).collect()
+
+        st.success(f"Successfully executed INSERT and UPDATE for table {selected_table}")
+
     except Exception as e:
-        st.error(f"Error updating record flag in {source_table}: {e}")
-
-# Function to insert new row in source table
-def insert_into_source_table(source_table, row_data, new_value, editable_column):
-    try:
-        # Create a copy of row_data to avoid modifying the original DataFrame
-        row_data_copy = row_data.copy()
-        
-        # Remove the editable column from the copied dictionary
-        if editable_column.upper() in row_data_copy:
-            del row_data_copy[editable_column.upper()]
-
-        # Remove the RECORD_FLAG column from the copied dictionary
-        if 'RECORD_FLAG' in row_data_copy:
-            del row_data_copy['RECORD_FLAG']
-
-        # Remove the INSERT_TS column from the copied dictionary
-        if 'INSERT_TS' in row_data_copy:
-            del row_data_copy['INSERT_TS']
-    
-        columns = ", ".join(row_data_copy.keys())
-        
-        # Properly format the values based on their type
-        formatted_values = []
-        for col, val in row_data_copy.items():
-            if isinstance(val, str):
-                formatted_values.append(f"'{val}'")
-            elif pd.isna(val):  # Handle potential NaN values, converting to NULL
-                formatted_values.append("NULL")
-            elif isinstance(val, (int, float)):
-                formatted_values.append(str(val))
-            elif isinstance(val, pd.Timestamp):  # Format Timestamp
-                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")  # Snowflake TIMESTAMP format
-            elif isinstance(val, datetime):  # Format datetime object
-                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
-            else:
-                formatted_values.append(f"'{str(val)}'")  # Default to string if unknown type
-
-        values = ", ".join(formatted_values)
-
-        insert_sql = f"""
-            INSERT INTO {source_table} ({columns}, {editable_column}, record_flag, insert_ts)
-            VALUES ({values}, '{new_value}', 'A', CURRENT_TIMESTAMP())
-        """
-        session.sql(insert_sql).collect()
-    except Exception as e:
-        st.error(f"Error inserting into {source_table}: {e}")
-
-# Function to insert into override table
-def insert_into_override_table(target_table, asofdate, segment, category, src_ins_ts, amount_old, amount_new):
-    try:
-        insert_sql = f"""
-            INSERT INTO {target_table} (asofdate, segment, category, src_ins_ts, amount_old, amount_new, insert_ts, record_flag)
-            VALUES ('{asofdate}', '{segment}', '{category}', '{src_ins_ts}', {amount_old}, {amount_new}, CURRENT_TIMESTAMP(), 'O')
-        """
-        session.sql(insert_sql).collect()
-    except Exception as e:
-        st.error(f"Error inserting into {target_table}: {e}")
+        st.error(f"Error executing insert/update: {e}")
 
 # Main app
 def main():
@@ -152,7 +118,7 @@ def main():
         st.stop()
 
     if not module_tables_df.empty:
-        available_tables = module_tables_df['SOURCE_TABLE'].unique()  # Get source tables based on module
+        available_tables = module_tables_df['SOURCE_TABLE'].unique() # Get source tables based on module
 
         # Add select table box
         selected_table = st.selectbox("Select Table", available_tables)
@@ -163,22 +129,11 @@ def main():
         if not table_info_df.empty:
             target_table_name = table_info_df['TARGET_TABLE'].iloc[0]
             editable_column = table_info_df['EDITABLE_COLUMN'].iloc[0]
-            editable_column_upper = editable_column.upper()
+            join_keys = table_info_df['JOIN_KEYS'].iloc[0]
 
             # Display the editable column in a disabled selectbox
             st.selectbox("Editable Column", [editable_column], disabled=True, key="editable_column_selectbox")
-
-            # Display the editable column label below the selectbox
-            st.markdown(f"**Editable Column:** {editable_column_upper}")
-
-            # Determine primary key columns dynamically based on selected_table
-            if selected_table == 'portfolio_perf':
-                primary_key_cols = ['ASOFDATE', 'SEGMENT', 'CATEGORY']
-            elif selected_table == 'fact_msme':
-                primary_key_cols = ['ASOFDATE', 'SEGMENT', 'CATEGORY']
-            else:
-                st.error("Primary key columns not defined for this table. Please update the code.")
-                st.stop()
+            st.markdown(f"**Editable Column:** {editable_column}")
 
             # Split the data into two tabs
             tab1, tab2 = st.tabs(["Source Data", "Overridden Values"])
@@ -195,9 +150,6 @@ def main():
                     # Make the dataframe editable using st.data_editor
                     edited_df = source_df.copy()
 
-                    # Modify column header to add pencil icon in the editable column
-                    edited_df = edited_df.rename(columns={editable_column_upper: f"{editable_column_upper} ✏️"})
-
                     # Apply a background color to the editable column
                     def highlight_editable_column(df, column_name):
                         styled_df = pd.DataFrame('', index=df.index, columns=df.columns)
@@ -205,9 +157,9 @@ def main():
                         return styled_df
 
                     # Disable editing for all columns except the selected editable column
-                    disabled_cols = [col for col in edited_df.columns if col != f"{editable_column_upper} ✏️"]
+                    disabled_cols = [col for col in edited_df.columns if col != f"{editable_column.upper()} ✏️"]
 
-                    styled_df = edited_df.style.apply(highlight_editable_column, column_name=f"{editable_column_upper} ✏️", axis=None)
+                    styled_df = edited_df.style.apply(highlight_editable_column, column_name=f"{editable_column.upper()} ✏️", axis=None)
 
                     edited_df = st.data_editor(
                         styled_df,  # Pass the styled dataframe
@@ -221,39 +173,22 @@ def main():
                     if st.button("Submit Updates"):
                         try:
                             # Identify rows that have been edited
-                            changed_rows = edited_df[edited_df[f"{editable_column_upper} ✏️"] != source_df[editable_column_upper]]
+                            changed_rows = edited_df[edited_df[f"{editable_column.upper()} ✏️"] != source_df[editable_column.upper()]]
 
                             if not changed_rows.empty:
                                 for index, row in changed_rows.iterrows():
-                                    # Extract primary key values
-                                    primary_key_values = {col: row[col] for col in primary_key_cols}
+                                    # Get the new and old value for the selected column
+                                    new_value = row[f"{editable_column.upper()} ✏️"]
+                                    old_value = source_df.loc[index, editable_column.upper()]
 
-                                    # Get new value for the selected column
-                                    new_value = row[f"{editable_column_upper} ✏️"]
-                                    old_value = source_df.loc[index, editable_column_upper]
+                                    # 1. Perform Insert and Update dynamically
+                                    execute_insert_update(selected_table, target_table_name, join_keys, editable_column)
 
-                                    # Get the old insert timestamp
-                                    src_ins_ts = str(source_df.loc[index, 'INSERT_TS'])
+                                    # Capture the current timestamp and store it in session state
+                                    current_timestamp = datetime.now().strftime('%B %d, %Y %H:%M:%S')
+                                    st.session_state.last_update_time = current_timestamp
 
-                                    # Before updating we need to extract current record values from source table.
-                                    asofdate = row['ASOFDATE']
-                                    segment = row['SEGMENT']
-                                    category = row['CATEGORY']
-
-                                    # 1. Mark the old record as 'D'
-                                    update_source_table_record_flag(selected_table, primary_key_values)
-
-                                    # 2. Insert the new record with 'A'
-                                    insert_into_source_table(selected_table, source_df.loc[index].to_dict(), new_value, editable_column)
-
-                                    # 3. Insert into override table
-                                    insert_into_override_table(target_table_name, asofdate, segment, category, src_ins_ts, old_value, new_value)
-
-                                # Capture the current timestamp and store it in session state
-                                current_timestamp = datetime.now().strftime('%B %d, %Y %H:%M:%S')
-                                st.session_state.last_update_time = current_timestamp
-
-                                st.success("Data updated successfully!")
+                                    st.success("Data updated successfully!")
                             else:
                                 st.info("No changes were made.")
 
