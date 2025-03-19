@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from snowflake.snowpark.context import get_active_session
+from snowflake.snowpark import Session
 from datetime import datetime
 
 # Page configuration
@@ -13,20 +13,23 @@ st.set_page_config(
 # Title with custom styling
 st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
 
-# Snowflake credentials from Streamlit secrets
-sf_config = {
-    "account": st.secrets["snowflake"]["SNOWFLAKE_ACCOUNT"],
-    "user": st.secrets["snowflake"]["SNOWFLAKE_USER"],
-    "password": st.secrets["snowflake"]["SNOWFLAKE_PASSWORD"],
-    "warehouse": st.secrets["snowflake"]["SNOWFLAKE_WAREHOUSE"],
-    "database": st.secrets["snowflake"]["SNOWFLAKE_DATABASE"],
-    "schema": st.secrets["snowflake"]["SNOWFLAKE_SCHEMA"]
-}
+# Retrieve Snowflake credentials from Streamlit secrets
+try:
+    connection_parameters = {
+        "account": st.secrets["SNOWFLAKE_ACCOUNT"],
+        "user": st.secrets["SNOWFLAKE_USER"],
+        "password": st.secrets["SNOWFLAKE_PASSWORD"],
+        "warehouse": st.secrets["SNOWFLAKE_WAREHOUSE"],
+        "database": st.secrets["SNOWFLAKE_DATABASE"],
+        "schema": st.secrets["SNOWFLAKE_SCHEMA"],
+    }
 
-# Get active Snowflake session
-session = get_active_session()
-if session is None:
-    st.error("Unable to establish a Snowflake session. Please ensure you are running this app within a Snowflake environment.")
+    # ✅ Create a Snowpark session
+    session = Session.builder.configs(connection_parameters).create()
+    st.success("✅ Successfully connected to Snowflake!")
+
+except Exception as e:
+    st.error(f"❌ Failed to connect to Snowflake: {e}")
     st.stop()
 
 # Function to fetch data based on the table name
@@ -214,7 +217,7 @@ if not module_tables_df.empty:
                                 # Get the old insert timestamp
                                 src_ins_ts = str(source_df.loc[index, 'INSERT_TS'])
 
-                                #Before updating we need extract current record values from source table.
+                                # Before updating we need extract current record values from source table.
                                 asofdate = row['ASOFDATE']
                                 segment = row['SEGMENT']
                                 category = row['CATEGORY']
