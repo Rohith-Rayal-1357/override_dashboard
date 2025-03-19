@@ -136,27 +136,22 @@ def main():
     query_params = st.query_params
     module_number = query_params.get("module", None)
 
+    # Get tables for the selected module
+    module_tables_df = fetch_override_ref_data(module_number)
+
     # Display Module Name
-    if module_number:
-        st.markdown(f"<h2 style='text-align: center;'>Module: {module_number}</h2>", unsafe_allow_html=True)
+    if module_number and not module_tables_df.empty:
+        # Get the module name from the Override_Ref table
+        module_name = module_tables_df['MODULE_NAME'].iloc[0]
+        st.markdown(f"<h2 style='text-align: center;'>Module: {module_name}</h2>", unsafe_allow_html=True)
     else:
         st.info("Please select a module from Power BI.")
         st.stop()
-
-    # Get tables for the selected module
-    module_tables_df = fetch_override_ref_data(module_number)
 
     if not module_tables_df.empty:
 
         available_tables = module_tables_df['SOURCE_TABLE'].unique() #Get source tables based on module
         
-        #Here you want to allow user filter based on the source table? If so, let's keep it here, but
-        #If no, then skip this part. And I am skipping it for now.
-        #selected_table = st.selectbox("Select Table", available_tables)
-
-        #Since we filter to the "table_info_df" with the first source table,
-        #Let's grab the first source table name, assuming there will be always one.
-        #But we don't want to have the user select again with st.selectbox since it is not needed here
         selected_table = available_tables[0] #This takes the first sourcetable name for module
         
         #Filter Override_Ref data based on the selected table
