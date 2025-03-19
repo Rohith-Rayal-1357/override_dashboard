@@ -76,7 +76,7 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
     try:
         # Create a copy of row_data to avoid modifying the original DataFrame
         row_data_copy = row_data.copy()
-        
+
         # Remove the editable column from the copied dictionary
         if editable_column.upper() in row_data_copy:
             del row_data_copy[editable_column.upper()]
@@ -88,9 +88,9 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
         # Remove the INSERT_TS column from the copied dictionary
         if 'INSERT_TS' in row_data_copy:
             del row_data_copy['INSERT_TS']
-    
+
         columns = ", ".join(row_data_copy.keys())
-        
+
         # Properly format the values based on their type
         formatted_values = []
         for col, val in row_data_copy.items():
@@ -103,7 +103,7 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
             elif isinstance(val, pd.Timestamp):  # Format Timestamp
                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")  # Snowflake TIMESTAMP format
             elif isinstance(val, datetime):  # Format datetime object
-                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
+                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
             else:
                 formatted_values.append(f"'{str(val)}'")  # Default to string if unknown type
 
@@ -260,11 +260,10 @@ def main():
             else:
                 st.info(f"No overridden data available in {target_table_name}.")
 
-        else:
-            st.warning("No table information found in Override_Ref for the selected table.")
-
     else:
-        st.warning("No tables found for the selected module in Override_Ref table.")
+        st.warning("No table information found in Override_Ref for the selected table.")
+    
+# Need to close the first if-statment
 
 # Run the main function
 if __name__ == "__main__":
