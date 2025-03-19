@@ -150,13 +150,23 @@ if not module_tables_df.empty:
     # Select table within the module
     selected_table = st.selectbox("Select Table", available_tables)
 
+    # Fetch data for the selected table
+    source_df = fetch_data(selected_table)
+
+    # Add a dropdown for selecting the editable column
+    if not source_df.empty:
+        available_columns = source_df.columns.tolist()
+        editable_column = st.selectbox("Select Editable Column", available_columns)
+        editable_column_upper = editable_column.upper()
+    else:
+        st.warning(f"No data available in {selected_table} to select editable columns.")
+        st.stop()
+
     # Filter Override_Ref data based on the selected table
     table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
     if not table_info_df.empty:
         target_table_name = table_info_df['TARGET_TABLE'].iloc[0]
-        editable_column = table_info_df['EDITABLE_COLUMN'].iloc[0]
-        editable_column_upper = editable_column.upper()
 
         # Determine primary key columns dynamically based on selected_table
         if selected_table == 'portfolio_perf':
@@ -172,7 +182,7 @@ if not module_tables_df.empty:
             st.subheader(f"Source Data from {selected_table}")
 
             # Fetch data at the beginning
-            source_df = fetch_data(selected_table)
+            # source_df = fetch_data(selected_table) #No need to fetch again
             if not source_df.empty:
                 # Retain only 'A' records
                 source_df = source_df[source_df['RECORD_FLAG'] == 'A'].copy()
@@ -221,7 +231,6 @@ if not module_tables_df.empty:
                                 asofdate = row['ASOFDATE']
                                 segment = row['SEGMENT']
                                 category = row['CATEGORY']
-
 
                                 # 1. Mark the old record as 'D'
                                 update_source_table_record_flag(selected_table, primary_key_values)
