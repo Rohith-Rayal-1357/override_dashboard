@@ -158,6 +158,9 @@ if not module_tables_df.empty:
         editable_column = table_info_df['EDITABLE_COLUMN'].iloc[0]
         editable_column_upper = editable_column.upper()
 
+        # Display the editable column in a disabled selectbox
+        st.selectbox("Editable Column", [editable_column], disabled=True)
+
         # Determine primary key columns dynamically based on selected_table
         if selected_table == 'portfolio_perf':
             primary_key_cols = ['ASOFDATE', 'SEGMENT', 'CATEGORY']
