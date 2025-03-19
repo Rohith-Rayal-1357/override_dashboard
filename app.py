@@ -77,19 +77,20 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column,
         # Create a copy of row_data to avoid modifying the original DataFrame
         row_data_copy = row_data.copy()
 
-        # Remove the editable column and primary key columns from the copied dictionary
-        cols_to_remove = [editable_column.upper()] + [col.upper() for col in primary_key_cols]
-        for col in cols_to_remove:
-            if col in row_data_copy:
-                del row_data_copy[col]
+        # Remove the editable column from the copied dictionary
+        if editable_column.upper() in row_data_copy:
+            del row_data_copy[editable_column.upper()]
 
-        # Remove the RECORD_FLAG and INSERT_TS columns if they exist
-        for col in ['RECORD_FLAG', 'INSERT_TS']:
-            if col in row_data_copy:
-                del row_data_copy[col]
+        # Remove the RECORD_FLAG column from the copied dictionary
+        if 'RECORD_FLAG' in row_data_copy:
+            del row_data_copy['RECORD_FLAG']
 
+        # Remove the INSERT_TS column from the copied dictionary
+        if 'INSERT_TS' in row_data_copy:
+            del row_data_copy['INSERT_TS']
+    
         columns = ", ".join(row_data_copy.keys())
-
+        
         # Properly format the values based on their type
         formatted_values = []
         for col, val in row_data_copy.items():
@@ -102,41 +103,26 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column,
             elif isinstance(val, pd.Timestamp):  # Format Timestamp
                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")  # Snowflake TIMESTAMP format
             elif isinstance(val, datetime):  # Format datetime object
-                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
+                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
             else:
                 formatted_values.append(f"'{str(val)}'")  # Default to string if unknown type
 
         values = ", ".join(formatted_values)
 
-        # Construct the column list for the INSERT statement, including primary key columns
-        insert_columns = ", ".join([*row_data_copy.keys(), editable_column] + primary_key_cols + ['record_flag', 'insert_ts'])
-
-        # Extract primary key values from the original row_data for the new row
-        primary_key_values = [row_data[col.upper()] for col in primary_key_cols]
-        primary_key_placeholders = ", ".join([f"'{val}'" if isinstance(val, str) else str(val) for val in primary_key_values])
-
-        insert_values = ", ".join([*formatted_values, f"'{new_value}'"] + [primary_key_placeholders] + ["'A'", "CURRENT_TIMESTAMP()"])
-
         insert_sql = f"""
-            INSERT INTO {source_table} ({insert_columns})
-            VALUES ({values}, '{new_value}', {primary_key_placeholders}, 'A', CURRENT_TIMESTAMP())
+            INSERT INTO {source_table} ({columns}, {editable_column}, record_flag, insert_ts)
+            VALUES ({values}, '{new_value}', 'A', CURRENT_TIMESTAMP())
         """
-        insert_sql = f"""
-            INSERT INTO {source_table} ({', '.join([*row_data_copy.keys(), editable_column] + primary_key_cols + ['record_flag', 'insert_ts'])})
-            VALUES ({', '.join([*formatted_values, f"'{new_value}'"] + [f"'{row_data[col.upper()]}'" for col in primary_key_cols] + ["'A'", "CURRENT_TIMESTAMP()"])})
-        """
-
         session.sql(insert_sql).collect()
     except Exception as e:
         st.error(f"Error inserting into {source_table}: {e}")
-
 
 # Function to insert into override table
 def insert_into_override_table(target_table, primary_key_values, src_ins_ts, amount_old, amount_new):
     try:
         # Construct the column and value lists for the INSERT statement
-        columns = ", ".join([*primary_key_values.keys(), 'src_ins_ts', 'amount_old', 'amount_new', 'insert_ts', 'record_flag'])
-        values = ", ".join([f"'{val}'" if isinstance(val, str) else str(val) for val in primary_key_values.values()] + [f"'{src_ins_ts}'", str(amount_old), str(amount_new), "CURRENT_TIMESTAMP()", "'O'"])
+        columns = ", ".join(primary_key_values.keys() + ['src_ins_ts', 'amount_old', 'amount_new', 'insert_ts', 'record_flag'])
+        values = ", ".join([f"'{val}'" if isinstance(val, (str, datetime, pd.Timestamp)) else str(val) for val in primary_key_values.values()] + [f"'{src_ins_ts}'", str(amount_old), str(amount_new), "CURRENT_TIMESTAMP()", "'O'"])
 
         # Construct the INSERT SQL statement
         insert_sql = f"""
@@ -160,7 +146,7 @@ def main():
     if module_number and not module_tables_df.empty:
         # Get the module name from the Override_Ref table
         module_name = module_tables_df['MODULE_NAME'].iloc[0]
-
+        
         # Display the module name in a light ice blue box
         st.markdown(f"""
             <div style="background-color: #E0F7FA; padding: 10px; border-radius: 5px; text-align: center; font-size: 16px;">
@@ -172,11 +158,11 @@ def main():
         st.stop()
 
     if not module_tables_df.empty:
-        available_tables = module_tables_df['SOURCE_TABLE'].unique()  # Get source tables based on module
+        available_tables = module_tables_df['SOURCE_TABLE'].unique() # Get source tables based on module
 
         # Add select table box
         selected_table = st.selectbox("Select Table", available_tables)
-
+        
         # Filter Override_Ref data based on the selected table
         table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
@@ -245,17 +231,16 @@ def main():
                                     old_value = source_df.loc[index, editable_column_upper]
 
                                     # Get the old insert timestamp
-                                    src_ins_ts = str(source_df.loc[index, 'INSERT_TS'])
+                                    src_ins_ts = source_df.loc[index, 'INSERT_TS']  # Get the Timestamp object
 
-                                    # Construct primary key values dictionary for override table
+                                    # Construct primary key values dictionary
                                     primary_key_values = {col: row[col] for col in primary_key_cols}
 
                                     # 1. Mark the old record as 'D'
-                                    primary_key_values_source = {col: row[col] for col in primary_key_cols}
-                                    update_source_table_record_flag(selected_table, primary_key_values_source)
+                                    update_source_table_record_flag(selected_table, primary_key_values)
 
                                     # 2. Insert the new record with 'A'
-                                    insert_into_source_table(selected_table, source_df.loc[index].to_dict(), new_value, editable_column, primary_key_cols)
+                                    insert_into_source_table(selected_table, source_df.loc[index].to_dict(), new_value, editable_column)
 
                                     # 3. Insert into override table
                                     insert_into_override_table(target_table_name, primary_key_values, src_ins_ts, old_value, new_value)
