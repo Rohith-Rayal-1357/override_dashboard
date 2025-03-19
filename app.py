@@ -88,9 +88,9 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column,
         # Remove the INSERT_TS column from the copied dictionary
         if 'INSERT_TS' in row_data_copy:
             del row_data_copy['INSERT_TS']
-    
+
         columns = ", ".join(row_data_copy.keys())
-        
+
         # Properly format the values based on their type
         formatted_values = []
         for col, val in row_data_copy.items():
@@ -103,7 +103,7 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column,
             elif isinstance(val, pd.Timestamp):  # Format Timestamp
                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")  # Snowflake TIMESTAMP format
             elif isinstance(val, datetime):  # Format datetime object
-                 formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
+                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
             else:
                 formatted_values.append(f"'{str(val)}'")  # Default to string if unknown type
 
@@ -218,7 +218,7 @@ def main():
                         disabled=disabled_cols
                     )
 
-                    # Submit button to update the source table and insert to the target table
+                    # Submit button to update the source table
                     if st.button("Submit Updates"):
                         try:
                             # Identify rows that have been edited
@@ -231,7 +231,7 @@ def main():
                                     old_value = source_df.loc[index, editable_column_upper]
 
                                     # Get the old insert timestamp
-                                    src_ins_ts = source_df.loc[index, 'INSERT_TS']  # Get the Timestamp object
+                                    src_ins_ts = source_df.loc[index, 'INSERT_TS']
 
                                     # Construct primary key values dictionary
                                     primary_key_values = {col: row[col] for col in primary_key_cols}
@@ -240,7 +240,7 @@ def main():
                                     update_source_table_record_flag(selected_table, primary_key_values)
 
                                     # 2. Insert the new record with 'A'
-                                    insert_into_source_table(selected_table, source_df.loc[index].to_dict(), new_value, editable_column)
+                                    insert_into_source_table(selected_table, source_df.loc[index].to_dict(), new_value, editable_column, primary_key_cols)
 
                                     # 3. Insert into override table
                                     insert_into_override_table(target_table_name, primary_key_values, src_ins_ts, old_value, new_value)
