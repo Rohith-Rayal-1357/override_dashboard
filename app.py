@@ -28,6 +28,9 @@ st.markdown("""
             border-radius: 5px;
             margin-bottom: 10px;
         }
+        .highlight-editable {
+            background-color: #FFFFE0; /* Highlight editable column with light yellow */
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -203,21 +206,22 @@ if not module_tables_df.empty:
 
                 def highlight_editable_column(df, column_name):
                     styled_df = pd.DataFrame('', index=df.index, columns=df.columns)
-                    styled_df[column_name] = 'background-color: #FFFFE0'
+                    styled_df[column_name] = 'background-color: #FFFFE0'  # Highlight the editable column
                     return styled_df
-
-                # Display the editable column, read-only
-                st.markdown(f"Editable Column: {editable_column}")
 
                 # Apply style to highlight the editable column
                 styled_df = edited_df.style.apply(highlight_editable_column, column_name=editable_column, axis=None)
 
+                # Display the editable column, read-only
+                st.markdown(f"Editable Column: {editable_column}")
+
+                # Apply the data editor with the editable column highlighted
                 edited_df = st.data_editor(
                     styled_df,
                     key=f"data_editor_{selected_table}_{editable_column}",
                     num_rows="dynamic",
                     use_container_width=True,
-                    disabled=[col for col in edited_df.columns if col != editable_column and col not in primary_key_cols]
+                    disabled=[col for col in edited_df.columns if col != editable_column and col not in primary_key_cols]  # Disable non-editable columns
                 )
 
                 # Submit updates
