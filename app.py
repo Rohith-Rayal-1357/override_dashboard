@@ -75,7 +75,12 @@ def fetch_data(table_name):
 # Function to fetch last updated timestamp
 def fetch_last_updated_timestamp():
     try:
-        result = session.sql("SELECT TIMESTAMP FROM LAST_UPDATED_TIMESTAMP WHERE ID = 'Override_Ref'").collect()
+        # Check if the table exists or if there is an error in the query
+        result = session.sql("""
+            SELECT LAST_UPDATED_TIMESTAMP FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'LAST_UPDATED_TIMESTAMP'
+        """).collect()
+
         if result:
             last_updated_timestamp = result[0][0]
             return last_updated_timestamp.strftime('%B %d, %Y %H:%M:%S')
