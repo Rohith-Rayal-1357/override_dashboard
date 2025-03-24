@@ -64,19 +64,18 @@ def fetch_data(table_name):
         st.error(f"Error fetching data from {table_name}: {e}")
         return pd.DataFrame()
 
-# Function to fetch override ref data based on the selected module
-def fetch_override_ref_data(selected_module=None):
+# Function to fetch last updated timestamp
+def fetch_last_updated_timestamp():
     try:
-        df = session.table("Override_Ref").to_pandas()
-        df.columns = [col.upper() for col in df.columns]
-
-        if selected_module:
-            module_num = int(selected_module.split('-')[1])
-            df = df[df['MODULE_NUM'] == module_num]
-        return df
+        result = session.sql("SELECT TIMESTAMP FROM LAST_UPDATED_TIMESTAMP WHERE ID = 'Override_Ref'").collect()
+        if result:
+            last_updated_timestamp = result[0][0]
+            return last_updated_timestamp.strftime('%B %d, %Y %H:%M:%S')
+        else:
+            return "No updates yet"
     except Exception as e:
-        st.error(f"Error fetching data from Override_Ref: {e}")
-        return pd.DataFrame()
+        st.error(f"Error fetching last updated timestamp: {e}")
+        return "Error fetching timestamp"
 
 # Function to insert into override table
 def insert_into_override_table(target_table, row_data, old_value, new_value):
@@ -162,19 +161,6 @@ def update_source_table_record_flag(source_table, primary_key_values):
     except Exception as e:
         st.error(f"Error updating record flag in {source_table}: {e}")
 
-# Function to fetch last updated timestamp
-def fetch_last_updated_timestamp():
-    try:
-        result = session.sql("SELECT TIMESTAMP FROM LAST_UPDATED_TIMESTAMP WHERE ID = 'Override_Ref'").collect()
-        if result:
-            last_updated_timestamp = result[0][0]
-            return last_updated_timestamp.strftime('%B %d, %Y %H:%M:%S')
-        else:
-            return "No updates yet"
-    except Exception as e:
-        st.error(f"Error fetching last updated timestamp: {e}")
-        return "Error fetching timestamp"
-
 # Main app
 override_ref_df = fetch_data("Override_Ref")
 if not override_ref_df.empty:
@@ -189,7 +175,7 @@ selected_module = st.selectbox("Select Module", available_modules, key="module_s
 # Display selected module
 st.markdown(f"Module: {selected_module}")
 
-module_tables_df = fetch_override_ref_data(selected_module)
+module_tables_df = fetch_data("Override_Ref")
 
 if not module_tables_df.empty:
     available_tables = module_tables_df['SOURCE_TABLE'].unique()
@@ -248,11 +234,8 @@ if not module_tables_df.empty:
                                 insert_into_source_table(selected_table, source_df.loc[index].to_dict(), new_value, editable_column)
                                 update_source_table_record_flag(selected_table, primary_key_values)
 
-                            # Update last updated timestamp in the metadata table
-                            session.sql("""
-                                INSERT INTO LAST_UPDATED_TIMESTAMP (ID, TIMESTAMP)
-                                VALUES ('Override_Ref', CURRENT_TIMESTAMP())
-                            """).collect()
+                            # Update last updated timestamp
+                            st.session_state.last_update_time = fetch_last_updated_timestamp()
 
                             st.success("👍 Data updated successfully!")
                         else:
@@ -269,11 +252,17 @@ if not module_tables_df.empty:
                 st.dataframe(override_df, use_container_width=True)
             else:
                 st.info(f"No overridden data available in {target_table_name}.")
+
     else:
         st.warning("No table information found in Override_Ref for the selected table.")
 else:
     st.warning("No tables found for the selected module in Override_Ref table.")
 
-# Footer with dynamic timestamp
-last_updated_timestamp = fetch_last_updated_timestamp()
-st.markdown(f"Portfolio Performance Override System • Last updated: {last_updated_timestamp}")
+# Footer
+if 'last_update_time' in st.session_state:
+    last_update_time = st.session_state.last_update_time
+    st.markdown("---")
+    st.caption(f"Portfolio Performance Override System • Last updated: {last_update_time}")
+else:
+    st.markdown("---")
+    st.caption("Portfolio Performance Override System • Last updated: N/A")
