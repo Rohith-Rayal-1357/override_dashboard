@@ -92,25 +92,11 @@ def insert_into_override_table(target_table, row_data, old_value, new_value):
         holding_fund_ids = row_data['HOLDING_FUND_IDS']
         unitized_owner_ind = row_data['UNITIZED_OWNER_IND']
 
-        # Insert into the override table
         insert_sql = f"""
             INSERT INTO {target_table} (AS_OF_DATE, ASSET_CLASS, SEGMENT, SEGMENT_NAME, STRATEGY, STRATEGY_NAME, PORTFOLIO, PORTFOLIO_NAME, HOLDING_FUND_IDS, MARKET_VALUE_OLD, MARKET_VALUE_NEW, UNITIZED_OWNER_IND, AS_AT_DATE, RECORD_FLAG)
             VALUES ('{as_of_date}', '{asset_class}', '{segment}', '{segment_name}', '{strategy}', '{strategy_name}', '{portfolio}', '{portfolio_name}', '{holding_fund_ids}', {old_value}, {new_value}, {unitized_owner_ind}, CURRENT_TIMESTAMP(), 'O')
         """
         session.sql(insert_sql).collect()
-
-        # After inserting into the override table, update the "last updated" timestamp in a metadata table
-        update_timestamp_sql = """
-            MERGE INTO Last_Updated_Timestamp AS target
-            USING (SELECT CURRENT_TIMESTAMP() AS timestamp) AS source
-            ON target.ID = 'Override_Ref'  -- Assuming there is an ID to identify the timestamp for your override
-            WHEN MATCHED THEN 
-                UPDATE SET target.TIMESTAMP = source.timestamp
-            WHEN NOT MATCHED THEN 
-                INSERT (ID, TIMESTAMP) VALUES ('Override_Ref', source.timestamp)
-        """
-        session.sql(update_timestamp_sql).collect()
-
     except Exception as e:
         st.error(f"Error inserting into {target_table}: {e}")
 
@@ -154,7 +140,7 @@ def insert_into_source_table(source_table, row_data, new_value, editable_column)
         session.sql(insert_sql).collect()
     except Exception as e:
         st.error(f"Error inserting into {source_table}: {e}")
-        
+
 # Function to update record flag in source table
 def update_source_table_record_flag(source_table, primary_key_values):
     try:
@@ -176,11 +162,10 @@ def update_source_table_record_flag(source_table, primary_key_values):
     except Exception as e:
         st.error(f"Error updating record flag in {source_table}: {e}")
 
-# Function to fetch the last updated timestamp
+# Function to fetch last updated timestamp
 def fetch_last_updated_timestamp():
     try:
-        # Fetch the latest timestamp from the metadata table (Last_Updated_Timestamp)
-        result = session.sql("SELECT TIMESTAMP FROM Last_Updated_Timestamp WHERE ID = 'Override_Ref'").collect()
+        result = session.sql("SELECT TIMESTAMP FROM LAST_UPDATED_TIMESTAMP WHERE ID = 'Override_Ref'").collect()
         if result:
             last_updated_timestamp = result[0][0]
             return last_updated_timestamp.strftime('%B %d, %Y %H:%M:%S')
@@ -190,7 +175,7 @@ def fetch_last_updated_timestamp():
         st.error(f"Error fetching last updated timestamp: {e}")
         return "Error fetching timestamp"
 
-# Main app logic
+# Main app
 override_ref_df = fetch_data("Override_Ref")
 if not override_ref_df.empty:
     module_numbers = sorted(override_ref_df['MODULE_NUM'].unique())
@@ -263,6 +248,12 @@ if not module_tables_df.empty:
                                 insert_into_source_table(selected_table, source_df.loc[index].to_dict(), new_value, editable_column)
                                 update_source_table_record_flag(selected_table, primary_key_values)
 
+                            # Update last updated timestamp in the metadata table
+                            session.sql("""
+                                INSERT INTO LAST_UPDATED_TIMESTAMP (ID, TIMESTAMP)
+                                VALUES ('Override_Ref', CURRENT_TIMESTAMP())
+                            """).collect()
+
                             st.success("👍 Data updated successfully!")
                         else:
                             st.info("No changes were made.")
@@ -284,5 +275,5 @@ else:
     st.warning("No tables found for the selected module in Override_Ref table.")
 
 # Footer with dynamic timestamp
-last_updated = fetch_last_updated_timestamp()
-st.markdown(f"Portfolio Performance Override System • Last updated: {last_updated}")
+last_updated_timestamp = fetch_last_updated_timestamp()
+st.markdown(f"Portfolio Performance Override System • Last updated: {last_updated_timestamp}")
