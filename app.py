@@ -7,7 +7,7 @@ from datetime import datetime
 st.set_page_config(
     page_title="Editable Data Override App",
     page_icon="📊",
-    layout="CENTERED",  # Use wide layout for better spacing
+    layout="wide",  # Use wide layout for better spacing
     initial_sidebar_state="expanded"
 )
 
