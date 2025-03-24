@@ -75,10 +75,13 @@ def fetch_data(table_name):
 # Function to fetch last updated timestamp
 def fetch_last_updated_timestamp():
     try:
-        # Check if the table exists or if there is an error in the query
+        # Query to check if the table exists and get the last updated timestamp
         result = session.sql("""
-            SELECT LAST_UPDATED_TIMESTAMP FROM INFORMATION_SCHEMA.TABLES
+            SELECT LAST_ALTERED
+            FROM INFORMATION_SCHEMA.TABLES
             WHERE TABLE_NAME = 'LAST_UPDATED_TIMESTAMP'
+            AND TABLE_SCHEMA = 'YOUR_SCHEMA_NAME'  -- Replace with the correct schema name
+            AND TABLE_CATALOG = 'YOUR_DATABASE_NAME'  -- Replace with the correct database name
         """).collect()
 
         if result:
