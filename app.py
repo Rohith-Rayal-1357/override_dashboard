@@ -237,9 +237,14 @@ if not module_ref_df.empty:
                                 new_value = row[editable_column]
                                 old_value = source_df.loc[index, editable_column]
 
-                                insert_into_override_table(target_table_name, source_df.loc[index].to_dict(), old_value, new_value)
-                                insert_into_source_table(selected_table, source_df.loc[index].to_dict(), new_value, editable_column)
+                                # Update the source table record flag for the old row
                                 update_source_table_record_flag(selected_table, primary_key_values)
+
+                                # Insert the new row into the source table
+                                insert_into_source_table(selected_table, row.to_dict(), new_value, editable_column)
+
+                                # Insert into override table
+                                insert_into_override_table(target_table_name, row.to_dict(), old_value, new_value)
 
                             # Update last updated timestamp
                             st.session_state.last_update_time = fetch_last_updated_timestamp()
