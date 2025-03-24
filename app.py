@@ -172,14 +172,19 @@ def update_source_table_record_flag(source_table, primary_key_values):
 # Main app
 module_ref_df = fetch_data("Override_Ref")
 if not module_ref_df.empty:
-    module_names = module_ref_df['MODULE_NAME'].unique()  # Fetch module names
-    module_name = st.selectbox("Select Module", module_names, key="module_selector")
+    # Fetch the first module name
+    module_name = module_ref_df['MODULE_NAME'].iloc[0]
 
+    # Display module name in Ice-blue box
     st.markdown(f"<div class='module-box'>{module_name}</div>", unsafe_allow_html=True)
 
     # Fetch table details for the selected module
     selected_module_df = module_ref_df[module_ref_df['MODULE_NAME'] == module_name]
     selected_table = selected_module_df['SOURCE_TABLE'].iloc[0]
+
+    # Show dropdown for table selection
+    table_names = selected_module_df['SOURCE_TABLE'].unique()
+    selected_table = st.selectbox("Select Table", table_names, key="table_selector")
 
     table_info_df = selected_module_df[selected_module_df['SOURCE_TABLE'] == selected_table]
     if not table_info_df.empty:
