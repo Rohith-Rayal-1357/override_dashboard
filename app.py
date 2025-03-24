@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from snowflake.snowpark import Session
 from datetime import datetime
+from urllib.parse import urlparse, parse_qs
 
 # Page configuration
 st.set_page_config(
@@ -31,11 +32,25 @@ st.markdown("""
         .highlight-editable {
             background-color: #FFFFE0; /* Highlight editable column with light yellow */
         }
+        .module-box {
+            background-color: #E1F5FE;  /* Ice-blue box for the selected module */
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+        }
     </style>
 """, unsafe_allow_html=True)
 
 # Title with custom styling
 st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
+
+# Function to parse query parameters
+def get_url_parameter(param_name):
+    query_params = st.experimental_get_query_params()
+    return query_params.get(param_name, [None])[0]
 
 # Snowflake Connection Status using Streamlit secrets
 try:
@@ -165,6 +180,8 @@ def update_source_table_record_flag(source_table, primary_key_values):
         st.error(f"Error updating record flag in {source_table}: {e}")
 
 # Main app
+module_param = get_url_parameter("module")
+
 override_ref_df = fetch_data("Override_Ref")
 if not override_ref_df.empty:
     module_numbers = sorted(override_ref_df['MODULE_NUM'].unique())
@@ -173,17 +190,18 @@ else:
     available_modules = []
     st.warning("No modules found in Override_Ref table.")
 
-selected_module = st.selectbox("Select Module", available_modules, key="module_selector")
+# Use the module from the URL parameter or select the first one by default
+selected_module = module_param if module_param in available_modules else available_modules[0]
 
 # Display selected module
-st.markdown(f"Module: {selected_module}")
+st.markdown(f'<div class="module-box">Module: {selected_module}</div>', unsafe_allow_html=True)
 
-module_tables_df = fetch_data("Override_Ref")
+module_tables_df = override_ref_df[override_ref_df['MODULE_NUM'] == int(selected_module.split('-')[1])]
 
 if not module_tables_df.empty:
     available_tables = module_tables_df['SOURCE_TABLE'].unique()
 
-    selected_table = st.selectbox("Select Table", available_tables, key="table_selector")
+    selected_table = available_tables[0]  # Only display the table for the selected module
 
     table_info_df = module_tables_df[module_tables_df['SOURCE_TABLE'] == selected_table]
 
@@ -206,11 +224,8 @@ if not module_tables_df.empty:
 
                 def highlight_editable_column(df, column_name):
                     styled_df = pd.DataFrame('', index=df.index, columns=df.columns)
-                    styled_df[column_name] = 'background-color: #FFFFE0'  # Highlight the editable column
+                    styled_df[column_name] = 'background-color: #FFFFE0'
                     return styled_df
-
-                # Apply style to highlight the editable column
-                styled_df = edited_df.style.apply(highlight_editable_column, column_name=editable_column, axis=None)
 
                 # Display the editable column, read-only
                 st.markdown(f"Editable Column: {editable_column}")
@@ -256,11 +271,8 @@ if not module_tables_df.empty:
                 st.dataframe(override_df, use_container_width=True)
             else:
                 st.info(f"No overridden data available in {target_table_name}.")
-
-    else:
-        st.warning("No table information found in Override_Ref for the selected table.")
 else:
-    st.warning("No tables found for the selected module in Override_Ref table.")
+    st.warning("No table information found for the selected module in Override_Ref table.")
 
 # Footer
 if 'last_update_time' in st.session_state:
