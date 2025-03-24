@@ -47,9 +47,9 @@ st.markdown("""
 # Title with custom styling
 st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
 
-# Function to parse query parameters
+# Function to parse query parameters using `st.query_params`
 def get_url_parameter(param_name):
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params
     return query_params.get(param_name, [None])[0]
 
 # Snowflake Connection Status using Streamlit secrets
