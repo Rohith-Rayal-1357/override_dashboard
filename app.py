@@ -224,7 +224,8 @@ if not module_ref_df.empty:
                     key=f"data_editor_{selected_table}_{editable_column}",
                     num_rows="dynamic",
                     use_container_width=True,
-                    disabled=[col for col in source_df.columns if col != editable_column and col not in primary_key_cols]  # Disable non-editable columns
+                    disabled=[col for col in source_df.columns if col != editable_column]
+                    #disabled=[col for col in source_df.columns if col != editable_column and col not in primary_key_cols]  # Disable non-editable columns
                 )
 
                 # Submit updates
