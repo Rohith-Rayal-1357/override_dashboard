@@ -107,6 +107,68 @@ def insert_into_override_table(target_table, row_data, old_value, new_value):
     except Exception as e:
         st.error(f"Error inserting into {target_table}: {e}")
 
+# Function to insert into source table
+def insert_into_source_table(source_table, row_data, new_value, editable_column):
+    try:
+        row_data_copy = row_data.copy()
+
+        if editable_column.upper() in row_data_copy:
+            del row_data_copy[editable_column.upper()]
+
+        if 'RECORD_FLAG' in row_data_copy:
+            del row_data_copy['RECORD_FLAG']
+
+        if 'AS_AT_DATE' in row_data_copy:
+            del row_data_copy['AS_AT_DATE']
+
+        columns = ", ".join(row_data_copy.keys())
+        formatted_values = []
+
+        for col, val in row_data_copy.items():
+            if isinstance(val, str):
+                formatted_values.append(f"'{val}'")
+            elif val is None or pd.isna(val):
+                formatted_values.append("NULL")
+            elif isinstance(val, (int, float)):
+                formatted_values.append(str(val))
+            elif isinstance(val, pd.Timestamp):
+                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
+            elif isinstance(val, datetime):
+                formatted_values.append(f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'")
+            else:
+                formatted_values.append(f"'{str(val)}'")
+
+        values = ", ".join(formatted_values)
+
+        insert_sql = f"""
+            INSERT INTO {source_table} ({columns}, {editable_column}, record_flag, as_at_date)
+            VALUES ({values}, '{new_value}', 'A', CURRENT_TIMESTAMP())
+        """
+        session.sql(insert_sql).collect()
+    except Exception as e:
+        st.error(f"Error inserting into {source_table}: {e}")
+
+# Function to update record flag in source table
+def update_source_table_record_flag(source_table, primary_key_values):
+    try:
+        where_clause_parts = []
+        for col, val in primary_key_values.items():
+            if val is None:
+                where_clause_parts.append(f"{col} IS NULL")
+            else:
+                where_clause_parts.append(f"{col} = '{val}'")
+        where_clause = " AND ".join(where_clause_parts)
+
+        update_sql = f"""
+            UPDATE {source_table}
+            SET record_flag = 'D',
+                as_at_date = CURRENT_TIMESTAMP()
+            WHERE {where_clause} AND record_flag = 'A'
+        """
+        session.sql(update_sql).collect()
+    except Exception as e:
+        st.error(f"Error updating record flag in {source_table}: {e}")
+
 # Main app
 module_ref_df = fetch_data("Override_Ref")
 if not module_ref_df.empty:
