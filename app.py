@@ -211,7 +211,7 @@ if not module_ref_df.empty:
 
                 # Apply styling for the editable column
                 styled_df = source_df.style.apply(
-                    lambda x: ['background-color: #FFFFE0' if col == editable_column else '' for col in source_df.columns],
+                    lambda x: ['background-color: #FFFFE0' if col == editable_column ✏️  else '' for col in source_df.columns],
                     axis=0
                 )
 
@@ -221,7 +221,7 @@ if not module_ref_df.empty:
                 # Use Streamlit's data editor with the editable column
                 edited_df = st.data_editor(
                     source_df,
-                    key=f"data_editor_{selected_table}_{editable_column} ✏️",
+                    key=f"data_editor_{selected_table}_{editable_column}",
                     num_rows="dynamic",
                     use_container_width=True,
                     disabled=[col for col in source_df.columns if col != editable_column]
