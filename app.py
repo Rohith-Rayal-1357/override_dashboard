@@ -173,80 +173,78 @@ def update_source_table_record_flag(source_table, primary_key_values):
 module_ref_df = fetch_data("Override_Ref")
 if not module_ref_df.empty:
     module_names = module_ref_df['MODULE_NAME'].unique()  # Fetch module names
+    module_name = st.selectbox("Select Module", module_names, key="module_selector")
 
-    for module_name in module_names:
-        # Create a clickable button for each module
-        if st.button(f"Select Module: {module_name}"):
-            st.markdown(f"<div class='module-box'>{module_name}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='module-box'>{module_name}</div>", unsafe_allow_html=True)
 
-            # Fetch table details for the selected module
-            selected_module_df = module_ref_df[module_ref_df['MODULE_NAME'] == module_name]
-            selected_table = selected_module_df['SOURCE_TABLE'].iloc[0]
+    # Fetch table details for the selected module
+    selected_module_df = module_ref_df[module_ref_df['MODULE_NAME'] == module_name]
+    selected_table = selected_module_df['SOURCE_TABLE'].iloc[0]
 
-            table_info_df = selected_module_df[selected_module_df['SOURCE_TABLE'] == selected_table]
-            if not table_info_df.empty:
-                target_table_name = table_info_df['TARGET_TABLE'].iloc[0]
-                editable_column = table_info_df['EDITABLE_COLUMN'].iloc[0]
+    table_info_df = selected_module_df[selected_module_df['SOURCE_TABLE'] == selected_table]
+    if not table_info_df.empty:
+        target_table_name = table_info_df['TARGET_TABLE'].iloc[0]
+        editable_column = table_info_df['EDITABLE_COLUMN'].iloc[0]
 
-                primary_key_cols = ['AS_OF_DATE', 'ASSET_CLASS', 'SEGMENT', 'STRATEGY', 'PORTFOLIO', 'UNITIZED_OWNER_IND', 'HOLDING_FUND_IDS']
+        primary_key_cols = ['AS_OF_DATE', 'ASSET_CLASS', 'SEGMENT', 'STRATEGY', 'PORTFOLIO', 'UNITIZED_OWNER_IND', 'HOLDING_FUND_IDS']
 
-                tab1, tab2 = st.tabs(["Source Data", "Overridden Values"])
+        tab1, tab2 = st.tabs(["Source Data", "Overridden Values"])
 
-                with tab1:
-                    st.subheader(f"Source Data from {selected_table}")
-                    source_df = fetch_data(selected_table)
-                    if not source_df.empty:
-                        source_df = source_df[source_df['RECORD_FLAG'] == 'A'].copy()
+        with tab1:
+            st.subheader(f"Source Data from {selected_table}")
+            source_df = fetch_data(selected_table)
+            if not source_df.empty:
+                source_df = source_df[source_df['RECORD_FLAG'] == 'A'].copy()
 
-                        # Apply styling for the editable column
-                        styled_df = source_df.style.apply(lambda x: ['background-color: #FFFFE0' if col == editable_column else '' for col in source_df.columns], axis=0)
+                # Apply styling for the editable column
+                styled_df = source_df.style.apply(lambda x: ['background-color: #FFFFE0' if col == editable_column else '' for col in source_df.columns], axis=0)
 
-                        # Display the editable column, read-only
-                        st.markdown(f"Editable Column: {editable_column}")
+                # Display the editable column, read-only
+                st.markdown(f"Editable Column: {editable_column}")
 
-                        # Use Streamlit's data editor with the editable column
-                        edited_df = st.data_editor(
-                            source_df,
-                            key=f"data_editor_{selected_table}_{editable_column}",
-                            num_rows="dynamic",
-                            use_container_width=True,
-                            disabled=[col for col in source_df.columns if col != editable_column and col not in primary_key_cols]  # Disable non-editable columns
-                        )
+                # Use Streamlit's data editor with the editable column
+                edited_df = st.data_editor(
+                    source_df,
+                    key=f"data_editor_{selected_table}_{editable_column}",
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    disabled=[col for col in source_df.columns if col != editable_column and col not in primary_key_cols]  # Disable non-editable columns
+                )
 
-                        # Submit updates
-                        if st.button("Submit Updates"):
-                            try:
-                                changed_rows = edited_df[edited_df[editable_column] != source_df[editable_column]]
-                                if not changed_rows.empty:
-                                    for index, row in changed_rows.iterrows():
-                                        primary_key_values = {col: row[col] for col in primary_key_cols}
-                                        new_value = row[editable_column]
-                                        old_value = source_df.loc[index, editable_column]
+                # Submit updates
+                if st.button("Submit Updates"):
+                    try:
+                        changed_rows = edited_df[edited_df[editable_column] != source_df[editable_column]]
+                        if not changed_rows.empty:
+                            for index, row in changed_rows.iterrows():
+                                primary_key_values = {col: row[col] for col in primary_key_cols}
+                                new_value = row[editable_column]
+                                old_value = source_df.loc[index, editable_column]
 
-                                        insert_into_override_table(target_table_name, source_df.loc[index].to_dict(), old_value, new_value)
-                                        insert_into_source_table(selected_table, source_df.loc[index].to_dict(), new_value, editable_column)
-                                        update_source_table_record_flag(selected_table, primary_key_values)
+                                insert_into_override_table(target_table_name, source_df.loc[index].to_dict(), old_value, new_value)
+                                insert_into_source_table(selected_table, source_df.loc[index].to_dict(), new_value, editable_column)
+                                update_source_table_record_flag(selected_table, primary_key_values)
 
-                                    # Update last updated timestamp
-                                    st.session_state.last_update_time = fetch_last_updated_timestamp()
+                            # Update last updated timestamp
+                            st.session_state.last_update_time = fetch_last_updated_timestamp()
 
-                                    st.success("👍 Data updated successfully!")
-                                else:
-                                    st.info("No changes were made.")
-                            except Exception as e:
-                                st.error(f"Error during update/insert: {e}")
-                    else:
-                        st.info(f"No data available in {selected_table}.")
-
-                with tab2:
-                    st.subheader(f"Overridden Values from {target_table_name}")
-                    override_df = fetch_data(target_table_name)
-                    if not override_df.empty:
-                        st.dataframe(override_df, use_container_width=True)
-                    else:
-                        st.info(f"No overridden data available in {target_table_name}.")
+                            st.success("👍 Data updated successfully!")
+                        else:
+                            st.info("No changes were made.")
+                    except Exception as e:
+                        st.error(f"Error during update/insert: {e}")
             else:
-                st.warning("No table information found for the selected module.")
+                st.info(f"No data available in {selected_table}.")
+
+        with tab2:
+            st.subheader(f"Overridden Values from {target_table_name}")
+            override_df = fetch_data(target_table_name)
+            if not override_df.empty:
+                st.dataframe(override_df, use_container_width=True)
+            else:
+                st.info(f"No overridden data available in {target_table_name}.")
+    else:
+        st.warning("No table information found for the selected module.")
 else:
     st.warning("No modules found in Override_Ref table.")
 
