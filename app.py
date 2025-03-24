@@ -162,6 +162,20 @@ def update_source_table_record_flag(source_table, primary_key_values):
     except Exception as e:
         st.error(f"Error updating record flag in {source_table}: {e}")
 
+# Function to fetch dynamic last updated timestamp
+def fetch_last_updated_timestamp():
+    try:
+        # Query to get the most recent timestamp (adjust the column name as needed)
+        result = session.sql("SELECT MAX(AS_AT_DATE) FROM YOUR_TABLE").collect()  # Adjust the query
+        last_updated_timestamp = result[0][0]
+        if last_updated_timestamp:
+            return last_updated_timestamp.strftime('%B %d, %Y %H:%M:%S')
+        else:
+            return "No updates found"
+    except Exception as e:
+        st.error(f"Error fetching last updated timestamp: {e}")
+        return "Error fetching timestamp"
+
 # Main app
 override_ref_df = fetch_data("Override_Ref")
 if not override_ref_df.empty:
@@ -255,5 +269,6 @@ if not module_tables_df.empty:
 else:
     st.warning("No tables found for the selected module in Override_Ref table.")
 
-# Footer
-st.markdown("Portfolio Performance Override System • Last updated: March 24, 2025")
+# Footer with dynamic timestamp
+last_updated = fetch_last_updated_timestamp()
+st.markdown(f"Portfolio Performance Override System • Last updated: {last_updated}")
