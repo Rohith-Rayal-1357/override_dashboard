@@ -223,7 +223,12 @@ if not module_ref_df.empty:
             st.subheader(f"Source Data from {selected_table}")
             source_df = fetch_data(selected_table)
             if not source_df.empty:
+                # Filter the data by 'RECORD_FLAG' if needed
                 source_df = source_df[source_df['RECORD_FLAG'] == 'A'].copy()
+
+                # Drop any unwanted or extra columns (e.g., 'SERIAL_NUMBER' or any other column)
+                unwanted_columns = ['SERIAL_NUMBER']  # Add any extra columns to remove here
+                source_df = source_df.drop(columns=[col for col in unwanted_columns if col in source_df.columns])
 
                 # Apply styling for the editable column
                 styled_df = source_df.style.apply(
