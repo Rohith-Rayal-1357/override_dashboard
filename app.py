@@ -36,6 +36,34 @@ st.markdown("""
             font-weight: bold;
             text-align: center;
         }
+        /* Tooltip CSS for hover effect */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 250px;
+            background-color: #6c757d;
+            color: #fff;
+            text-align: center;
+            border-radius: 5px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%; /* Position above the button */
+            left: 50%;
+            margin-left: -125px; /* Centers the tooltip */
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -194,6 +222,9 @@ if not module_ref_df.empty:
         target_table_name = table_info_df['TARGET_TABLE'].iloc[0]
         editable_column = table_info_df['EDITABLE_COLUMN'].iloc[0]
 
+        # Fetch the description for the module from the Override_Ref table
+        description = table_info_df['DESCRIPTION'].iloc[0] if 'DESCRIPTION' in table_info_df.columns else "No description available."
+
         primary_key_cols = ['AS_OF_DATE', 'ASSET_CLASS', 'SEGMENT', 'STRATEGY', 'PORTFOLIO', 'UNITIZED_OWNER_IND', 'HOLDING_FUND_IDS']
 
         tab1, tab2 = st.tabs(["Source Data", "Overridden Values"])
@@ -223,6 +254,9 @@ if not module_ref_df.empty:
                 )
 
                 # Submit updates
+                # Display the description on hover
+                st.markdown(f'<div class="tooltip">Hover to see description<span class="tooltiptext">{description}</span></div>', unsafe_allow_html=True)
+
                 if st.button("Submit Updates"):
                     try:
                         changed_rows = edited_df[edited_df[editable_column] != source_df[editable_column]]
@@ -251,7 +285,6 @@ if not module_ref_df.empty:
                         st.error(f"Error during update/insert: {e}")
             else:
                 st.info(f"No data available in {selected_table}.")
-
         with tab2:
             st.subheader(f"Overridden Values from {target_table_name}")
             override_df = fetch_data(target_table_name)
