@@ -75,13 +75,8 @@ def fetch_data(table_name):
 # Function to fetch last updated timestamp
 def fetch_last_updated_timestamp():
     try:
-        # Query to check if the table exists and get the last updated timestamp
         result = session.sql("""
-            SELECT LAST_ALTERED
-            FROM INFORMATION_SCHEMA.TABLES
-            WHERE TABLE_NAME = 'LAST_UPDATED_TIMESTAMP'
-            AND TABLE_SCHEMA = 'YOUR_SCHEMA_NAME'  -- Replace with the correct schema name
-            AND TABLE_CATALOG = 'YOUR_DATABASE_NAME'  -- Replace with the correct database name
+            SELECT CURRENT_TIMESTAMP()
         """).collect()
 
         if result:
@@ -225,7 +220,6 @@ if not module_ref_df.empty:
                     num_rows="dynamic",
                     use_container_width=True,
                     disabled=[col for col in source_df.columns if col != editable_column]
-                    #disabled=[col for col in source_df.columns if col != editable_column and col not in primary_key_cols]  # Disable non-editable columns
                 )
 
                 # Submit updates
@@ -247,8 +241,8 @@ if not module_ref_df.empty:
                                 # Insert into override table
                                 insert_into_override_table(target_table_name, row.to_dict(), old_value, new_value)
 
-                            # Update last updated timestamp
-                            st.session_state.last_update_time = fetch_last_updated_timestamp()
+                            # Update last updated timestamp in session state
+                            st.session_state.last_update_time = datetime.now().strftime('%B %d, %Y %H:%M:%S')
 
                             st.success("👍 Data updated successfully!")
                         else:
