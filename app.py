@@ -223,10 +223,7 @@ if not module_ref_df.empty:
             st.subheader(f"Source Data from {selected_table}")
             source_df = fetch_data(selected_table)
             if not source_df.empty:
-                # Filter for active records and required columns
-                required_columns = ['AS_OF_DATE', 'ASSET_CLASS', 'SEGMENT', 'SEGMENT_NAME', 'STRATEGY', 'STRATEGY_NAME', 'PORTFOLIO', 'PORTFOLIO_NAME', 'HOLDING_FUND_IDS', 'UNITIZED_OWNER_IND', editable_column]
                 source_df = source_df[source_df['RECORD_FLAG'] == 'A'].copy()
-                source_df = source_df[required_columns]
 
                 # Apply styling for the editable column
                 styled_df = source_df.style.apply(
@@ -246,6 +243,7 @@ if not module_ref_df.empty:
                     disabled=[col for col in source_df.columns if col != editable_column]
                 )
 
+                # Submit updates
                 # Display the description on hover
                 st.markdown(f'<div class="tooltip">Hover to see description<span class="tooltiptext">{description}</span></div>', unsafe_allow_html=True)
 
@@ -254,9 +252,7 @@ if not module_ref_df.empty:
                         changed_rows = edited_df[edited_df[editable_column] != source_df[editable_column]]
                         if not changed_rows.empty:
                             for index, row in changed_rows.iterrows():
-                                # Correct primary key extraction
-                                primary_key_values = {col: row[col] for col in primary_key_cols if col in row} # Ensure the key exists in the row
-
+                                primary_key_values = {col: row[col] for col in primary_key_cols}
                                 new_value = row[editable_column]
                                 old_value = source_df.loc[index, editable_column]
 
