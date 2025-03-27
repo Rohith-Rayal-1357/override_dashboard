@@ -19,15 +19,6 @@ st.markdown("""
         .stButton>button {background-color: #1E88E5; color: white; border-radius: 5px; height: 40px;}
         .stSelectbox>label {font-size: 16px;}
         .stDataFrame {border: 1px solid #dddddd; border-radius: 8px;}
-        .success-message {
-            color: green;
-            font-weight: bold;
-            padding: 10px;
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            border-radius: 5px;
-            margin-bottom: 10px;
-        }
         .module-box {
             background-color: #D3E8FF; /* Ice-blue box for module */
             padding: 15px;
