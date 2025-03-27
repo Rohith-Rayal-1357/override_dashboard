@@ -232,7 +232,7 @@ if not module_ref_df.empty:
                 )
 
                 # Display the editable column, read-only
-                st.markdown(f"Editable Column: {editable_column}")
+                #st.markdown(f"Editable Column: {editable_column}")
 
                 # Use Streamlit's data editor with the editable column
                 edited_df = st.data_editor(
