@@ -226,17 +226,10 @@ if not module_ref_df.empty:
                 # Filter the data by 'RECORD_FLAG' if needed
                 source_df = source_df[source_df['RECORD_FLAG'] == 'A'].copy()
 
-                # Drop any unwanted or extra columns (e.g., 'SERIAL_NUMBER' or any other column)
-                unwanted_columns = ['SERIAL_NUMBER']  # Add any extra columns to remove here
-                source_df = source_df.drop(columns=[col for col in unwanted_columns if col in source_df.columns])
+                # Display only the columns present in the source table without adding any extra columns
+                st.dataframe(source_df, use_container_width=True)
 
                 # Apply styling for the editable column
-                styled_df = source_df.style.apply(
-                    lambda x: ['background-color: #FFFFE0' if col == editable_column else '' for col in source_df.columns],
-                    axis=0
-                )
-
-                # Display the editable column, read-only
                 st.markdown(f"Editable Column: {editable_column}")
 
                 # Use Streamlit's data editor with the editable column
