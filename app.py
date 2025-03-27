@@ -240,7 +240,7 @@ if not module_ref_df.empty:
                     key=f"data_editor_{selected_table}_{editable_column}",
                     num_rows="dynamic",
                     use_container_width=True,
-                    disabled=[col for col in source_df.columns if col != editable_column]
+                    disabled=[col for col in source_df.columns if col != editable_column],
                     index=None 
                 )
 
