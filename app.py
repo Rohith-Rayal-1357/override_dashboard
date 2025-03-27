@@ -227,7 +227,7 @@ if not module_ref_df.empty:
 
                 # Apply styling for the editable column
                 styled_df = source_df.style.apply(
-                    lambda x: ['background-color: #FFFFE0' if col == editable_column else '' for col in source_df.columns]
+                    lambda x: ['background-color: #FFFFE0' if col == editable_column else '' for col in source_df.columns],
                     axis=0
                 )
 
