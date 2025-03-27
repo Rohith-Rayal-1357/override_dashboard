@@ -225,10 +225,6 @@ if not module_ref_df.empty:
             if not source_df.empty:
                 source_df = source_df[source_df['RECORD_FLAG'] == 'A'].copy()
 
-                # Remove unwanted extra columns (keep only the editable column)
-                unwanted_columns = [col for col in source_df.columns if col != editable_column and col != 'RECORD_FLAG']
-                source_df.drop(columns=unwanted_columns, inplace=True)
-
                 # Apply styling for the editable column
                 styled_df = source_df.style.apply(
                     lambda x: ['background-color: #FFFFE0' if col == editable_column else '' for col in source_df.columns],
