@@ -223,13 +223,19 @@ if not module_ref_df.empty:
             st.subheader(f"Source Data from {selected_table}")
             source_df = fetch_data(selected_table)
             if not source_df.empty:
-                # Filter the data by 'RECORD_FLAG' if needed
                 source_df = source_df[source_df['RECORD_FLAG'] == 'A'].copy()
 
-                # Display only the columns present in the source table without adding any extra columns
-                st.dataframe(source_df, use_container_width=True)
+                # Remove unwanted extra columns (keep only the editable column)
+                unwanted_columns = [col for col in source_df.columns if col != editable_column and col != 'RECORD_FLAG']
+                source_df.drop(columns=unwanted_columns, inplace=True)
 
                 # Apply styling for the editable column
+                styled_df = source_df.style.apply(
+                    lambda x: ['background-color: #FFFFE0' if col == editable_column else '' for col in source_df.columns],
+                    axis=0
+                )
+
+                # Display the editable column, read-only
                 st.markdown(f"Editable Column: {editable_column}")
 
                 # Use Streamlit's data editor with the editable column
