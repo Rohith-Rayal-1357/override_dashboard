@@ -237,8 +237,8 @@ if not module_ref_df.empty:
                 # Use Streamlit's data editor with the editable column
                 edited_df = st.data_editor(
                     source_df,
-                    key=f"data_editor_{selected_table}_{editable_column}",
-                    #num_rows="dynamic",
+                    #key=f"data_editor_{selected_table}_{editable_column}",
+                    num_rows="dynamic",
                     use_container_width=True,
                     disabled=[col for col in source_df.columns if col != editable_column]
                 )
