@@ -68,7 +68,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Title with custom styling
-# st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #1E88E5;'>Override Dashboard</h1>", unsafe_allow_html=True)
 
 # Snowflake Connection Status using Streamlit secrets
 try:
@@ -81,11 +81,9 @@ try:
         "schema": st.secrets["SNOWFLAKE_SCHEMA"],
     }
 
-    # Create a Snowpark session using the connection parameters
+    # ✅ Create a Snowpark session
     session = Session.builder.configs(connection_parameters).create()
-
-    st.markdown('<div class="success-message">✅ Successfully connected to Snowflake!</div>', unsafe_allow_html=True)
-    
+    st.success("✅ Successfully connected to Snowflake!")
 
 except Exception as e:
     st.error(f"❌ Error connecting to Snowflake: {e}")
