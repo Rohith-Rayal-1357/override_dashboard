@@ -234,14 +234,16 @@ if not module_ref_df.empty:
                 # Display the editable column, read-only
                 st.markdown(f"Editable Column: {editable_column}")
 
+                # Remove the index column from the data editor display
+                source_df = source_df.reset_index(drop=True)
+
                 # Use Streamlit's data editor with the editable column
                 edited_df = st.data_editor(
                     source_df,
                     key=f"data_editor_{selected_table}_{editable_column}",
                     num_rows="dynamic",
                     use_container_width=True,
-                    disabled=[col for col in source_df.columns if col != editable_column],
-                    hide_index=True  #This line removes the index column
+                    disabled=[col for col in source_df.columns if col != editable_column]
                 )
 
                 # Submit updates
