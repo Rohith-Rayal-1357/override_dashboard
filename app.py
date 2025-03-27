@@ -241,6 +241,7 @@ if not module_ref_df.empty:
                     num_rows="dynamic",
                     use_container_width=True,
                     disabled=[col for col in source_df.columns if col != editable_column]
+                    index=None 
                 )
 
                 # Submit updates
